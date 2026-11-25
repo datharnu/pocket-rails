@@ -1,0 +1,15 @@
+{
+  "name": "pocket-rails-video",
+  "private": true,
+  "type": "module",
+  "description": "Records the demo video: drives the live site, adds ElevenLabs narration, assembles with ffmpeg.",
+  "scripts": {
+    "voice": "node --env-file=.env voice.mjs",
+    "record": "node --env-file=.env record.mjs",
+    "assemble": "node assemble.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.65.1",
+    "viem": "^2.57.12"
+  }
+}

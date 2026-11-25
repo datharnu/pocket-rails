@@ -138,25 +138,29 @@ function useList<T>(functionName: "getVault" | "getException" | "getBilling" | "
   return { items, isLoading: q.isLoading, refetch: q.refetch };
 }
 
+// "Loading" covers the counters too: until they arrive the list is empty, which must not look like "none".
 export function useAllVaults() {
   const c = useCounts();
   const l = useList<Vault>("getVault", c.vaults);
-  return { ...l, refetch: () => (c.refetch(), l.refetch()) };
+  return { ...l, isLoading: c.isLoading || l.isLoading, refetch: () => (c.refetch(), l.refetch()) };
 }
 
 export function useAllExceptions() {
   const c = useCounts();
-  return useList<Exception>("getException", c.exceptions);
+  const l = useList<Exception>("getException", c.exceptions);
+  return { ...l, isLoading: c.isLoading || l.isLoading };
 }
 
 export function useAllBillings() {
   const c = useCounts();
-  return useList<Billing>("getBilling", c.billings);
+  const l = useList<Billing>("getBilling", c.billings);
+  return { ...l, isLoading: c.isLoading || l.isLoading };
 }
 
 export function useAllCharges() {
   const c = useCounts();
-  return useList<Charge>("getCharge", c.charges);
+  const l = useList<Charge>("getCharge", c.charges);
+  return { ...l, isLoading: c.isLoading || l.isLoading };
 }
 
 export function useSpentThisWeek(vaultId?: bigint) {

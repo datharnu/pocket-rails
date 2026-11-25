@@ -18,3 +18,6 @@ contracts/broadcast/
 
 # event cache written by the web app (web/src/lib/indexer.ts)
 web/.cache/
+/tools/video/.env
+/tools/video/out/
+/tools/video/node_modules/
