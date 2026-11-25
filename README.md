@@ -63,53 +63,51 @@ flowchart LR
 **Child pays (push), step by step**
 
 ```mermaid
-sequenceDiagram
-    actor Child
-    participant App as App (phone)
-    participant Relayer
-    participant PR as PocketRails (Aevum)
-    participant Shop as Canteen
-    Child->>App: choose place, amount, note
-    App->>PR: previewPayment() (read, free)
-    PR-->>App: "inside your rules" or reason code
-    Child->>App: tap Pay → sign EIP-712 intent (no gas)
-    App->>Relayer: POST /api/rails/relay
-    Relayer->>Relayer: check signature, nonce, deadline, simulate
-    Relayer->>PR: pay(intent, signature)
-    alt inside the rules
-        PR->>Shop: transfer tUSD8
-        PR-->>App: Paid event
-    else a rule is broken
-        PR-->>App: Refused event + reason code (no money moves)
-    end
-    Note over App,Relayer: If the relayer is down, the child can send the same<br/>signed intent from their own wallet ("Send it myself").
+flowchart TD
+    A["Parent creates the vault, funds it and sets the rules"] --> B["Child signs an EIP-712 payment intent"]
+    B --> C["Relayer checks the network, signature, nonce and simulation, then submits"]
+    C --> D{"Contract checks the rules"}
+    D -->|Inside the rules| E["Paid"]
+    D -->|Outside the rules| F["Refused, recorded with a reason code, no money moves"]
+    F --> G["Child signs an exception request"]
+    G --> H{"Parent decides"}
+    H -->|Decline| I["Nothing is paid"]
+    H -->|Allow once| J["Child pays the exact request once"]
+    H -->|Change the rules| K["A new rules version applies"]
+    R["Parent revokes at any time"] -.-> X["Old intents and exceptions stop working"]
 ```
+
+The parent creates the vault, funds it with tUSD8 and sets the rules. The child signs an EIP-712 payment
+intent, and the relayer checks the network, the signature, the nonce and a simulation before submitting it.
+The contract then checks the rules: inside them, the payment is made; outside them, it is refused, recorded
+with a reason code, and no money moves. For something outside the rules, the child signs an exception
+request, and the parent can decline it, allow it once, or change the rules. An allowed exception covers only
+that exact request, once. The parent can revoke the child's access at any time, which ends all older intents
+and exceptions.
 
 **School bills (pull), step by step**
 
 ```mermaid
-sequenceDiagram
-    actor Parent
-    participant PR as PocketRails (Aevum)
-    participant School as School billing agent
-    participant Guard as Guardian agent (+ optional AI)
-    Parent->>PR: grantBilling(caps, expiry, veto window)
-    School->>PR: requestCharge(amount, note hash)
-    alt over a cap
-        PR-->>School: ChargeRefused + reason (recorded, nothing pending)
-    else inside the caps
-        PR-->>Guard: ChargeRequested (Pending until settleAfter)
-        Guard->>Guard: rules (duplicate, weekend, price), then AI note review
-        opt looks wrong
-            Guard->>PR: vetoCharge(reason)
-        end
-        opt parent decides
-            Parent->>PR: approveCharge (pays now, also overrides a veto) or vetoCharge
-        end
-        School->>PR: settle() after the window
-        PR->>School: transfer tUSD8 to the treasury the parent approved
-    end
+flowchart TD
+    A["Parent grants a billing permission: billing key, treasury, per-charge cap, per-period cap, expiry, veto window of at least 1 minute, optional first-charge approval"] --> B["School billing key requests a charge"]
+    B --> C{"Inside the caps?"}
+    C -->|No| D["Refused and recorded"]
+    C -->|Yes| E["Pending during the veto window"]
+    E -->|Parent or guardian vetoes| V["Vetoed, not paid unless the parent overrides it"]
+    E -->|No veto or the parent approves early| G["After the window anyone can settle"]
+    V -->|Parent overrides| G
+    G --> H{"Permission still valid and vault funded?"}
+    H -->|Yes| I["Paid to the approved treasury"]
+    H -->|No| J["Failed: permission revoked or vault short"]
 ```
+
+The parent grants a billing permission with a billing key, a treasury address, a per-charge cap, a
+per-period cap, an expiry date, a veto window of at least 1 minute and, optionally, approval of the first
+charge. The school's billing key then requests a charge. Inside the caps, the charge is pending; outside them,
+it is refused and recorded. During the veto window the parent or the guardian can veto the charge. The parent
+can also approve it early or override a veto, but the guardian can never approve. After the window anyone can
+settle the charge: it is paid to the approved treasury, or it fails if the permission was revoked or the
+vault doesn't hold enough.
 
 ### Child pays (push)
 
@@ -248,8 +246,20 @@ same way a direct debit works.
 | **Explorer (Blockscout)** | Source verified; every screen and log links transactions to it. | [contract page](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract) |
 | **Starter kit** (`qday-io/aevum-starter-kit`) | Foundry setup, `MockUSD8`, Shanghai check, chunked log helper, chain config, Next.js scaffolding, relayer protections. Credited in `NOTICE.md`. | `packages/aevum`, `tools/` |
 | **Faucets** | Demo accounts were funded from the Discord faucet (the web faucet requires mainnet holdings); demo amounts are scaled to one claim. | `docs/PLATFORM_FEEDBACK.md` |
-| **ERC-4337 EntryPoint v0.7 and Kernel v3.1** | **Not used yet.** They're deployed on Aevum; making the parent a Kernel smart account with session keys is on the roadmap. | Roadmap |
+| **ERC-4337 EntryPoint v0.7 and Kernel v3.1** | Not used yet (see the note below the table) | Roadmap |
 | **ERC-8004 identity registry** | **Not used.** The starter kit says QDay's registry isn't open for this challenge, so approved places are stored in PocketRails. | Roadmap |
+
+### Why no smart account or session key yet
+
+On 18 Nov 2026, PQA-Morris updated the challenge's official starter kit with the commit "Docs: account
+abstraction is not required and not supported" ([`f7bc531`](https://github.com/qday-io/aevum-starter-kit/commit/f7bc531)).
+Its FAQ says account abstraction isn't required for this challenge, that there is no officially supported
+bundler or paymaster, that gasless payments can use EIP-3009 with a relayer, and that budgets, limits, expiry
+and revoke should be written into your own contract. Pocket Rails follows that guidance: gasless top-ups use
+EIP-3009, and the child's gasless payments use the same relayer pattern with signed EIP-712 intents. The
+child's key is scoped by the contract: it can only pay approved places inside the caps or request exceptions,
+and the parent can revoke it instantly. The contract already accepts ERC-1271 signatures, so moving the parent
+or child to a Kernel smart account with session keys is a roadmap step, not a redesign.
 
 ## Business model and distribution
 
@@ -335,7 +345,7 @@ make deploy-aevum ACCOUNT=deployer           # prints the PocketRails address; n
 
 4. Put the address in `web/.env.local` (`NEXT_PUBLIC_NETWORKS=aevum`, `NEXT_PUBLIC_RAILS_AEVUM=…`) and the
    relayer key in `RELAYER_PRIVATE_KEY`, then add the address to the Contracts table above with a link to
-   the exact commit (the explorer's verifier isn't working yet).
+   the exact commit, then verify the source on the explorer (see the Contracts section).
 
 ### Run the whole flow locally (no funds needed)
 
