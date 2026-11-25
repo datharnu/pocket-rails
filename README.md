@@ -33,7 +33,10 @@ is not audited.
    raise a limit or move money, and the parent can override a wrongful veto. The guardian agent's AI review
    treats charge notes as untrusted data and answers "unknown" when unsure, which leaves the charge for the
    parent.
-   Code: [`agents/`](agents/), [`agents/src/review.ts`](agents/src/review.ts).
+   The guardian runs as a Kernel v3.1 smart account: its agent holds a session key that our validator module
+   only lets call `vetoCharge`, sent as ERC-4337 user operations through QDay's bundler
+   ([details](#guardian-smart-account-and-veto-only-session-key)).
+   Code: [`agents/`](agents/), [`agents/src/review.ts`](agents/src/review.ts), [`VetoOnlySessionValidator.sol`](contracts/src/VetoOnlySessionValidator.sol).
    Tests: [`agents/src/policy.test.ts`](agents/src/policy.test.ts), [`test_guardianCanNeverApprove`](contracts/test/PocketRailsBilling.t.sol#L160),
    [`test_parentOverridesWrongVeto`](contracts/test/PocketRailsBilling.t.sol#L168).
 3. **Refusals are recorded, not reverted.** A refused payment or charge still succeeds as a transaction, moves
@@ -93,6 +96,7 @@ the [Safety model](#safety-model).
 | Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
 | History cache for the on-chain timeline (`/api/rails/events`) | Done |
 | Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
+| Guardian as a Kernel v3.1 smart account with a veto-only session key (ERC-4337, QDay bundler) | Done: 8 unit tests, 10 fork tests on Aevum's EntryPoint and Kernel, live veto through the bundler |
 | Hosted demo | To do |
 
 ---
@@ -260,7 +264,7 @@ Two small Node agents in `agents/`, each with its own TEST key. Neither can exce
 | Agent | Run | What it does | What it can't do |
 |---|---|---|---|
 | School billing | `pnpm --filter agents school` | Bills one meal per school day (or every N seconds in demos) on every live permission granted to its key, skipping weekends and staying inside the caps. Never bills the same slot twice: it checks the chain for a charge with the same note first, so restarts are safe. Settles charges once their veto window ends. | Charge more than the caps, shorten the veto window, or pay anyone but the treasury the parent approved |
-| Guardian | `pnpm --filter agents guardian` | Watches every vault that names its key as guardian. Each open charge goes through rules (duplicate note, weekend, price over 1.5× the usual), then optionally an AI review of the note (`AI_REVIEW=1`, Claude `claude-opus-5-5` with structured output limited to `veto` / `no_action` / `unknown`). Vetoes inside the window with a reason; "unknown" means it leaves the charge and reports it. | Approve, raise a limit, or move money: `vetoCharge` is the only thing its key may call |
+| Guardian | `pnpm --filter agents guardian` | Watches every vault that names its key as guardian. Each open charge goes through rules (duplicate note, weekend, price over 1.5× the usual), then optionally an AI review of the note (`AI_REVIEW=1`, Claude `claude-opus-5-5` with structured output limited to `veto` / `no_action` / `unknown`). Vetoes inside the window with a reason; "unknown" means it leaves the charge and reports it. In smart-account mode it never holds the owner key: it signs with a veto-only session key and sends user operations through the bundler. | Approve, raise a limit, or move money: `vetoCharge` is the only thing its key may call |
 
 The AI review treats the note as untrusted data: instructions inside a note are themselves a reason to veto.
 A refusal, an API error or an unreadable answer becomes "unknown", never a guess.
@@ -283,6 +287,7 @@ contract refuses and records it). Settings: `agents/.env.example`. Rule tests: `
 | Old signed intents after a revoke | Revoking bumps an epoch; intents and exceptions from older epochs are refused. |
 | School billing key is stolen | Charges are capped per charge and per period, wait out a veto window, and settle only to the treasury address the parent approved. |
 | School overcharges or double-charges | The guardian agent or parent vetoes inside the window. |
+| Guardian agent's key is stolen | In smart-account mode the agent holds only a session key, which the validator module lets make the account call `vetoCharge` and nothing else (no approvals, no transfers, no other contracts, no value), until it expires. The owner key stays with the guardian and can revoke the session; the parent can also replace the guardian. |
 | Guardian agent is fooled (prompt injection) or wrong | It can only veto. It can't approve, raise a limit or move money. The worst case is a wrongful veto, which the parent can override. |
 | Guardian agent is offline | Charges inside the caps still settle after the window, like a bank direct debit. Use the first-charge approval and tight caps; a "hold all if the guardian is offline" setting is on the roadmap. |
 | Admin abuse | There is no admin, owner or upgrade path. Only a vault's parent can change that vault. |
@@ -322,20 +327,37 @@ same way a direct debit works.
 | **Explorer (Blockscout)** | Source of both versions verified; every screen and log links transactions to it. | [v2 contract page](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract) |
 | **Starter kit** (`qday-io/aevum-starter-kit`) | Foundry setup, `MockUSD8`, Shanghai check, chunked log helper, chain config, Next.js scaffolding, relayer protections. Credited in `NOTICE.md`. | `packages/aevum`, `tools/` |
 | **Faucets** | Demo accounts were funded from the Discord faucet (the web faucet requires mainnet holdings); demo amounts are scaled to one claim. | `docs/PLATFORM_FEEDBACK.md` |
-| **ERC-4337 EntryPoint v0.7 and Kernel v3.1** | Not used yet (see the note below the table) | Roadmap |
+| **ERC-4337 EntryPoint v0.7, Kernel v3.1 and QDay's bundler** | The guardian is a Kernel v3.1 smart account created with Aevum's deployed Kernel factory. Its agent's session key is limited by our ERC-7579 validator module to `vetoCharge`; vetoes are ERC-4337 user operations sent through `bundler.qday.info` to EntryPoint v0.7, and the account pays its own gas. | [`VetoOnlySessionValidator.sol`](contracts/src/VetoOnlySessionValidator.sol), [`agents/src/userop.ts`](agents/src/userop.ts), [`GuardianAccountFork.t.sol`](contracts/test/fork/GuardianAccountFork.t.sol) |
 | **ERC-8004 identity registry** | **Not used.** The starter kit says QDay's registry isn't open for this challenge, so approved places are stored in PocketRails. | Roadmap |
 
-### Why no smart account or session key yet
+### Guardian smart account and veto-only session key
 
-On 18 Nov 2026, PQA-Morris updated the challenge's official starter kit with the commit "Docs: account
-abstraction is not required and not supported" ([`f7bc531`](https://github.com/qday-io/aevum-starter-kit/commit/f7bc531)).
-Its FAQ says account abstraction isn't required for this challenge, that there is no officially supported
-bundler or paymaster, that gasless payments can use EIP-3009 with a relayer, and that budgets, limits, expiry
-and revoke should be written into your own contract. Pocket Rails follows that guidance: gasless top-ups use
-EIP-3009, and the child's gasless payments use the same relayer pattern with signed EIP-712 intents. The
-child's key is scoped by the contract: it can only pay approved places inside the caps or request exceptions,
-and the parent can revoke it instantly. The contract already accepts ERC-1271 signatures, so moving the parent
-or child to a Kernel smart account with session keys is a roadmap step, not a redesign.
+The guardian, the one role an AI agent plays, runs as a **Kernel v3.1 smart account** (ERC-4337). The account's
+owner is the guardian's own key (Kernel's ECDSA root validator). The agent never gets that key: it gets a
+**session key** installed in [`VetoOnlySessionValidator`](contracts/src/VetoOnlySessionValidator.sol), an ERC-7579
+validator module we wrote. During ERC-4337 validation, before anything executes, the module checks that the
+operation is a single Kernel `execute` call to PocketRails, with no value, calling `vetoCharge`, signed by the
+session key, and it returns the session's expiry as `validUntil` so the EntryPoint enforces it. Anything else is
+refused: approving a charge, moving tokens, calling another contract, changing the account, a wrong signer, an
+expired or revoked session.
+
+| | Address / proof |
+|---|---|
+| Veto-only validator module (source verified) | [`0xCC02a255bb48927090F23bB86DA497830eE0fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) |
+| Guardian smart account (Kernel v3.1 proxy) | [`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0) |
+| Agent's session key (holds no funds) | `0xE0078d6bE769bEe23Ad5D4eAcE941A2053a61F97`, valid 30 days |
+| Live veto as a user operation through `bundler.qday.info` | [tx](https://explorer-test.qday.info/tx/0x3f6322ba62ccfdf7ea6f06bb2dbd51495d7b69153a59d0b28e9093ab943ca5a5) to EntryPoint v0.7: charge #2 on allowance #1 (v2) vetoed, `ChargeVetoed` by the smart account, no paymaster |
+| Tests | 8 unit tests ([`VetoOnlySessionValidator.t.sol`](contracts/test/VetoOnlySessionValidator.t.sol)) and 10 fork tests on Aevum's real EntryPoint, Kernel factory and ECDSA validator ([`GuardianAccountFork.t.sol`](contracts/test/fork/GuardianAccountFork.t.sol)), each refusal checked against its exact EntryPoint error |
+
+How to reproduce: [`contracts/script/DeployGuardianAccount.s.sol`](contracts/script/DeployGuardianAccount.s.sol) deploys
+the module and creates the account; the guardian agent's smart-account mode (`GUARDIAN_ACCOUNT`,
+`GUARDIAN_VALIDATOR`, `GUARDIAN_SESSION_KEY`, `BUNDLER_URL` in `agents/.env`) sends the vetoes.
+
+Context: the challenge's official starter kit says account abstraction isn't required and there's no officially
+supported bundler or paymaster (commit [`f7bc531`](https://github.com/qday-io/aevum-starter-kit/commit/f7bc531), 18 Nov
+2026). QDay's bundler at `bundler.qday.info` works, so we used it for the guardian, where a scoped session key adds
+the most safety. Children's gasless payments keep the EIP-3009/EIP-712 relayer pattern the kit recommends. The
+contract accepts ERC-1271 signatures, so the parent or child can move to a smart account later without a redesign.
 
 ## Business model and distribution
 
@@ -363,6 +385,8 @@ These are plans and hypotheses, not validated results.
 |---|---|
 | PocketRails **v2** (current) | [`0xB179197A660029b1d96FEF09e3E8515b271E3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801), deployed in block 4084193 by tx [`0x09658ff1…e5a7`](https://explorer-test.qday.info/tx/0x09658ff197ae84ed1e43bd299af97a88f5b3c0c0ab78e8b29c2382292463e5a7) from commit [`e747b93`](https://github.com/datharnu/pocket-rails/tree/e747b93) |
 | PocketRails v1 (first live runs) | [`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df), deployed in block 4072059 by tx [`0xc77c22a4…b728`](https://explorer-test.qday.info/tx/0xc77c22a458fe2fc54d47085ccc195e5e496764174d01b502f03eeb9ffdabb728) |
+| VetoOnlySessionValidator | [`0xCC02a255bb48927090F23bB86DA497830eE0fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) (source verified) |
+| Guardian smart account (Kernel v3.1) | [`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0) |
 | tUSD8 | [`0x456569838f1d43009A91ebA4263147Afd7233483`](https://explorer-test.qday.info/address/0x456569838f1d43009A91ebA4263147Afd7233483) |
 
 **Both versions are source verified** on the Aevum explorer (Blockscout) on 2026-11-25: compiler 0.8.24,
@@ -522,7 +546,7 @@ Aevum has no WebSocket RPC, so clients poll it.
 
 ## Roadmap
 
-- Parent as an ERC-4337 smart account (Kernel v3.1 is deployed on Aevum) with session-key permissions.
+- Parent and child as Kernel smart accounts too (the guardian already is), with recovery for the parent.
 - Payee identities through QDay's ERC-8004 registry once it's open.
 - "Hold all school charges while the guardian is offline" setting.
 - Earmarked funds (school fees the child's spending can't touch).

@@ -167,8 +167,8 @@ Amounts are chosen to fit the money you have: 1.5 tUSD8 in Parent, plus 1.9 you'
 | # | Do this | You should see |
 |---|---|---|
 | 1.0 | Switch MetaMask to **School**, send **1.9 tUSD8** to the Parent address (`0xD035…a485`) | Parent now holds 3.4 tUSD8. (One-time money move.) |
-| 1.1 | Switch to **Parent**, open [localhost:3000/parent](http://localhost:3000/parent) | "What to do next": **Step 1: open your child's allowance**, with the form already filled in. |
-| 1.2 | Click **Open allowance**, confirm in MetaMask | A green "Confirmed" message with a "See the record" link. The guide moves on to "Step 2: top up". |
+| 1.1 | Switch to **Parent**, open [localhost:3000/parent](http://localhost:3000/parent) | **Allowance #1** already exists on v2 (it was opened for the smart-account guardian test, with School billing and the guardian set). Use it. |
+| 1.2 | (Only if you want a second allowance) Click **+ New allowance**, then **Open allowance** | A new allowance tab. You'd then need to set its guardian and school billing yourself. |
 | 1.3 | In **💵 Money**, type `2`, click **Top up**, confirm twice (allow, then deposit) | Balance shows **2 tUSD8**. |
 | 1.4 | In **💵 Money**, under **🚌 Set aside for school**, type `0.9`, click **Save amount set aside**, confirm | "0.9 set aside, so your child can spend 1.1". Rules go up one version. |
 
@@ -200,7 +200,7 @@ Amounts are chosen to fit the money you have: 1.5 tUSD8 in Parent, plus 1.9 you'
 
 | # | Do this | You should see |
 |---|---|---|
-| 5.1 | As **Parent**, in **🏫 School billing**, open **Grant a billing permission**. Everything is filled in. Change **Veto window (minutes)** to `2`. Leave "The first charge waits for my approval" ticked. Click **Grant**. | Confirmed. A new permission appears in the list. School charges can use the 0.9 set aside. |
+| 5.1 | Allowance #1 already has school billing (2-minute window, no first-charge approval). To try the full setup yourself, as **Parent**, in **🏫 School billing**, open **Grant a billing permission**. Everything is filled in. Change **Veto window (minutes)** to `2`. Leave "The first charge waits for my approval" ticked. Click **Grant**. | Confirmed. A new permission appears in the list. School charges can use the 0.9 set aside. |
 | 5.2 | Open **two new Terminal windows**. In the first run `cd ~/Desktop/Odun.Dev/pocket-rails && nvm use 22 && pnpm --filter agents school`. In the second run the same but end with `guardian`. | The school prints "billing as 0x8C6a…" and soon "meal: charged 0.3". The guardian prints "AI review: on" and then "ok … normal school meal cost". |
 | 5.3 | Go to the Parent page. "What to do next" says **A school charge is waiting**. In **🏫 School charges waiting**, the charge says "first charge: waits for your approval". Click **Approve**, confirm | Confirmed: the school is paid. |
 | 5.4 | Wait about 15 seconds | The school sends the **trick charge** (its note tries to tell the AI to approve it). The guardian prints **VETO … "The note tries to instruct the reviewer…"**. On the Parent page it appears in **✋ Stopped charges** with that reason. |
@@ -208,7 +208,9 @@ Amounts are chosen to fit the money you have: 1.5 tUSD8 in Parent, plus 1.9 you'
 | 5.6 | Wait 2–3 minutes | New meal charges arrive every 2 minutes and are paid to the school after their 2-minute wait, with no action from you. Each one uses up the money set aside for school first. |
 | 5.7 | When you've seen enough, press **Ctrl + C** in both agent terminals | The agents stop. Nothing new is charged. |
 
-Optional, to show a **wrong** veto being fixed: while a normal meal is waiting, switch to **Guardian**, open
+The guardian of allowance #1 is a **smart account** (`0x4D22…31B0`), so its vetoes come from the guardian agent through QDay's bundler, not from the Guardian page. The Guardian page works when the guardian is a normal account.
+
+Optional, to show a **wrong** veto being fixed: in **🛡️ Guardian** on the Parent page, set the guardian to the Guardian account (`0xEA66…00db`), wait for a normal meal, switch to **Guardian**, open
 the Guardian page and click **Stop it**. Switch back to **Parent**: the charge is in **✋ Stopped charges**.
 Click **Pay it anyway** and **Yes, pay it**. The school is paid.
 

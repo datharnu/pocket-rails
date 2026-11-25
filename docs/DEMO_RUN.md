@@ -47,3 +47,24 @@ the guardian. The guardian ran with AI review (`claude-opus-5-5`).
 
 Read from the chain afterwards: #1 and #3–#5 settled, #2 vetoed, 1.2 tUSD8 paid to the school, the week's
 1.5 cap fully used (5 × 0.3 counted, the vetoed one released).
+
+## Smart-account guardian run on v2 (2026-11-25)
+
+The guardian ran as a Kernel v3.1 smart account ([`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0)) whose agent signs with a veto-only
+session key ([validator module](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract)). Vetoes are ERC-4337 user operations sent
+through `bundler.qday.info` to EntryPoint v0.7. Contract: PocketRails v2.
+
+| Step | What happened | Transaction |
+|---|---|---|
+| Setup | Guardian owner deployed the veto-only validator | [deploy](https://explorer-test.qday.info/tx/0x0618d8b6fd85a643806a9be657f1f3b15b39fc06b7c141f50f0b51d043a9714b) |
+| Setup | Kernel factory created the guardian smart account with the session installed | [createAccount](https://explorer-test.qday.info/tx/0xffd87f7309ed5ac8be9937f67633d1128048f3d9b3a7cda756badf10ed46ae2f) |
+| Setup | Owner funded the account with 0.01 tQDAY for its own gas | [fund](https://explorer-test.qday.info/tx/0x81758ce1f1e2b19c3665a303f50d13a253bf8cd95264a528f7e71b7420ea6aa2) |
+| Setup | Parent opened allowance #1 for the child, with the School canteen approved | [createVault](https://explorer-test.qday.info/tx/0x01e674008ec179267596b0afd5f3e78f880020425aa8737311121d0c3b39cba7) |
+| Setup | Parent made the smart account the guardian | [setGuardian](https://explorer-test.qday.info/tx/0x573c8e072e5373b25a39edfc3026ef48ee9eca87418df90a05e13ff2b948b695) |
+| Setup | Parent granted school billing (0.3 per charge, 1.5 a week, 2-minute veto window) and topped up 0.3 | [grantBilling](https://explorer-test.qday.info/tx/0x4aa78d668704b203d59a6c58ce684b0a30b3eda12c10f68159cb6c16f7953295), [deposit](https://explorer-test.qday.info/tx/0xce7ad59f761e9bad88612f481bb47d3f2527e6259abb0a7795b0d6aebfae69f7) |
+| Charge #1 | School agent billed "Lunch"; AI review: normal school meal, left alone | [charge](https://explorer-test.qday.info/tx/0x1777a540bf190895faaec466a77621b7a2a7bcc5d8727b3a18a104f867c28824) |
+| Charge #2 | School agent sent the same "Lunch" again (`DEMO_SCENARIO=duplicate`) | [charge](https://explorer-test.qday.info/tx/0x8742a135da25a71250280b89a152bfbe500b33ae3a49f67eac7ca7121b5243f2) |
+| Veto | Guardian rule "duplicate of charge #1". The session key signed a user operation; QDay's bundler submitted it to EntryPoint v0.7; our validator allowed it because it is exactly `vetoCharge`. `ChargeVetoed` is emitted by the smart account. Success, no paymaster, 207,696 gas, 0.00023 tQDAY paid by the account. | [veto user operation](https://explorer-test.qday.info/tx/0x3f6322ba62ccfdf7ea6f06bb2dbd51495d7b69153a59d0b28e9093ab943ca5a5) |
+
+Read from the chain afterwards: charge #2 status Vetoed; the user operation's nonce key starts with
+`0x01cc02a255…`, which selects the veto-only validator.

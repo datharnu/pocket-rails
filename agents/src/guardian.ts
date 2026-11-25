@@ -14,21 +14,33 @@
  *
  * Env (agents/.env): RPC_URL, RAILS_ADDRESS, GUARDIAN_KEY, APP_URL, optional AI_REVIEW=1 (uses Anthropic
  * credentials from the environment), POLL_SECONDS (default 5), EXPECTED_PRICE (e.g. 0.3).
+ *
+ * Smart-account mode (recommended): set GUARDIAN_ACCOUNT (the guardian's Kernel smart account),
+ * GUARDIAN_VALIDATOR (VetoOnlySessionValidator), GUARDIAN_SESSION_KEY (the agent's session key) and
+ * BUNDLER_URL. Vetoes are then sent as ERC-4337 user operations signed by a session key that the contracts
+ * only allow to call vetoCharge. GUARDIAN_KEY isn't needed in this mode: the agent never holds the owner key.
  */
 import { parseUnits } from "viem";
 import { ChargeStatus, billingIsLive, connect, env, explain, log, readNotes, send, sleep, snapshot, usd, type Snapshot } from "./lib";
 import { evaluate, usualPrice, type ChargeFacts, type Decision } from "./policy";
 import { aiEnabled, reviewNote } from "./review";
+import { vetoViaSmartAccount } from "./userop";
+import type { Address } from "viem";
 
 const AGENT = "guardian";
-const c = await connect("GUARDIAN_KEY");
+const SMART = Boolean(process.env.GUARDIAN_ACCOUNT?.trim() && process.env.GUARDIAN_SESSION_KEY?.trim());
+const c = await connect(SMART ? "GUARDIAN_SESSION_KEY" : "GUARDIAN_KEY");
+const guardianAddress = (SMART ? env("GUARDIAN_ACCOUNT") : c.account.address) as Address;
+const validator = (SMART ? env("GUARDIAN_VALIDATOR") : "") as Address;
+const bundlerUrl = env("BUNDLER_URL", "https://bundler.qday.info");
 const POLL = Number(env("POLL_SECONDS", "5")) * 1000;
 const expected = process.env.EXPECTED_PRICE ? parseUnits(process.env.EXPECTED_PRICE, 6) : undefined;
 
 // Decisions already taken this session (no_action / unknown), so the AI isn't asked again every poll.
 const decided = new Map<bigint, Decision>();
 
-log(AGENT, `watching PocketRails ${c.rails} as ${c.account.address} on ${c.chain.name}`);
+log(AGENT, `watching PocketRails ${c.rails} as ${guardianAddress} on ${c.chain.name}`);
+log(AGENT, SMART ? `smart-account mode: session key ${c.account.address} (veto-only), via ${bundlerUrl}` : "EOA mode: vetoes are signed by GUARDIAN_KEY");
 log(AGENT, `AI review: ${aiEnabled() ? "on (claude-opus-5-5)" : "off (rules only; set AI_REVIEW=1 to enable)"}`);
 
 function facts(s: Snapshot): ChargeFacts[] {
@@ -41,7 +53,7 @@ function facts(s: Snapshot): ChargeFacts[] {
 async function tick() {
   const s = await snapshot(c);
   const all = facts(s);
-  const mine = new Set([...s.vaults].filter(([, v]) => v.guardian.toLowerCase() === c.account.address.toLowerCase()).map(([id]) => id));
+  const mine = new Set([...s.vaults].filter(([, v]) => v.guardian.toLowerCase() === guardianAddress.toLowerCase()).map(([id]) => id));
   if (mine.size === 0) return;
 
   const open = all.filter((f) => {
@@ -74,8 +86,13 @@ async function tick() {
     const label = `vault #${b.vaultId} charge #${f.id} (${usd(f.amount)} tUSD8, "${notes[f.memoHash.toLowerCase()] ?? "no note"}")`;
     if (d.action === "veto") {
       try {
-        const { hash, outcome } = await send(c, "vetoCharge", [f.id, d.reason.slice(0, 140)]);
-        log(AGENT, `VETO ${label}: ${d.reason} → ${outcome.kind === "failed" ? "transaction failed" : "recorded on-chain"} ${c.link(hash)}`);
+        if (SMART) {
+          const r = await vetoViaSmartAccount(c, { account: guardianAddress, validator, bundlerUrl, chargeId: f.id, reason: d.reason.slice(0, 140) });
+          log(AGENT, `VETO ${label}: ${d.reason} → recorded on-chain via user operation ${r.userOpHash.slice(0, 10)}… ${c.link(r.txHash)}`);
+        } else {
+          const { hash, outcome } = await send(c, "vetoCharge", [f.id, d.reason.slice(0, 140)]);
+          log(AGENT, `VETO ${label}: ${d.reason} → ${outcome.kind === "failed" ? "transaction failed" : "recorded on-chain"} ${c.link(hash)}`);
+        }
         decided.set(f.id, d);
       } catch (e) {
         // Most often the window closed or the parent already decided. Next poll re-reads the chain.
