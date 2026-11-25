@@ -17,6 +17,7 @@ is not audited.
 | **Contract** | [`0x7d54…40Df` on the Aevum explorer](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) (source verified) |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
+| **Plain-English guide** | [docs/GUIDE.md](docs/GUIDE.md): what it is with no crypto jargon, how to test it step by step, and a demo script |
 
 ## What makes Pocket Rails different
 
@@ -52,8 +53,9 @@ is not audited.
    scenario, a note that tries to instruct the AI review:
    [charge](https://explorer-test.qday.info/tx/0x12eb091a5b8db16324899627603553b156d1373cb78ba70b6ca9b864f7d258da),
    [veto](https://explorer-test.qday.info/tx/0x779643d86942280890ae0f78d572a48f8cb973ef37bb37ebe5f3a103093607bf).
-3. **The parent overrides a wrong veto.** `approveCharge` on a vetoed charge pays it now
-   ([test_parentOverridesWrongVeto](contracts/test/PocketRailsBilling.t.sol#L168)). The parent screen doesn't offer this yet.
+3. **The parent overrides a wrong veto.** On the parent screen, "Stopped charges" shows who vetoed each charge
+   and why; "Pay it anyway" (with a confirm step) calls `approveCharge`, which pays it now
+   ([test_parentOverridesWrongVeto](contracts/test/PocketRailsBilling.t.sol#L168)).
 4. **An over-cap charge is refused and recorded.** Run the school agent with `DEMO_SCENARIO=overcap`
    ([scenario](agents/src/school-biller.ts#L77), [test](contracts/test/PocketRailsBilling.t.sol#L78)).
 5. **The child's refused payment shows a plain explanation.** "This is more than you can spend in one
@@ -227,7 +229,7 @@ vault doesn't hold enough.
 | Page | Who | What they can do |
 |---|---|---|
 | `/` | Everyone | What Pocket Rails is, the four roles, live counts from the contract |
-| `/parent` | Parent | Open a vault (pre-filled in demo mode), top up and withdraw, edit rules (each save is a new version), approve or remove places, allow-once or decline requests, approve or veto school charges, grant and revoke school billing, set the guardian, pause or revoke everything, read the full on-chain history |
+| `/parent` | Parent | Open a vault (pre-filled in demo mode), top up and withdraw, edit rules (each save is a new version), approve or remove places, allow-once or decline requests, approve or veto school charges, pay a wrongly vetoed charge anyway (with a confirm step), grant and revoke school billing, set the guardian, pause or revoke everything, read the full on-chain history |
 | `/child` | Child (phone-first) | See balance and what's left this week, pay an approved place with a live rules check before signing, see plain-language refusals with a next step, ask for an exception, pay an allowed exception, see activity. Never needs gas. |
 | `/school` | School billing key | Send charges inside the caps, watch the veto window, settle when it's over |
 | `/guardian` | Guardian key | Veto open school charges with a reason. Nothing else. |

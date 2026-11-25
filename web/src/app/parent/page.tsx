@@ -211,6 +211,7 @@ function VaultDashboard({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
 
       <Requests vaultId={vaultId} vault={vault} label={label} />
       <SchoolCharges vaultId={vaultId} vault={vault} label={label} />
+      <StoppedCharges vaultId={vaultId} vault={vault} label={label} history={history.data} />
 
       <div className="grid-2">
         <Money vaultId={vaultId} vault={vault} />
@@ -343,6 +344,103 @@ function SchoolCharges({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
       </div>
       <StatusNotice status={status} />
       {!vault.guardian || vault.guardian === zeroAddress ? <p className="fine">Tip: set a guardian below to review charges for you.</p> : null}
+    </section>
+  );
+}
+
+/**
+ * Charges that were vetoed (by the guardian or the parent), with the parent's override.
+ * approveCharge on a vetoed charge pays it now. Only the parent can do this; the guardian never can.
+ * It's the parent's explicit decision, so the period cap doesn't block it (the amount still counts toward it).
+ * A charge from a revoked permission can't be paid, even by the parent.
+ */
+function StoppedCharges({
+  vaultId,
+  vault,
+  label,
+  history,
+}: {
+  vaultId: bigint;
+  vault: Vault;
+  label: (a: string) => string;
+  history: ReturnType<typeof useHistory>["data"];
+}) {
+  const billings = useAllBillings();
+  const charges = useAllCharges();
+  const write = useRailsWrite();
+  const { status, run, busy } = useAction();
+  const [confirming, setConfirming] = useState<bigint | null>(null);
+  const myBillings = new Map(billings.items.filter((b) => b.data.vaultId === vaultId).map((b) => [b.id, b.data]));
+  const stopped = charges.items.filter((c) => myBillings.has(c.data.billingId) && c.data.status === 3).slice(0, 5);
+  const serverNote = useServerNotes(stopped.map((c) => c.data.memoHash));
+  // Who vetoed each charge and why, from the ChargeVetoed events.
+  const vetoes = new Map<string, { by: string; reason: string }>();
+  for (const e of history ?? []) {
+    if (e.eventName === "ChargeVetoed" && !vetoes.has(String(e.args.chargeId))) vetoes.set(String(e.args.chargeId), { by: String(e.args.by), reason: String(e.args.reason ?? "") });
+  }
+  if (stopped.length === 0 && status.state === "idle") return null;
+
+  return (
+    <section id="stopped" className="card" aria-label="Stopped charges">
+      <h2>✋ Stopped charges</h2>
+      <p className="sub">
+        These school charges were vetoed, so nothing was paid. If one was stopped by mistake, you can still pay it. Only you can do this; the guardian
+        never can.
+      </p>
+      <div className="list">
+        {stopped.map(({ id, data: c }) => {
+          const b = myBillings.get(c.billingId)!;
+          const veto = vetoes.get(id.toString());
+          const who = veto ? label(veto.by) : "someone";
+          const live = !b.revoked && b.epoch === vault.billingEpoch;
+          const enough = vault.balance >= c.amount;
+          return (
+            <div key={id.toString()} className="item">
+              <div className="item-main">
+                <span className="item-title">
+                  {fmt(c.amount)} tUSD8 to {label(b.payTo)}
+                </span>
+                <span className="item-sub">
+                  “{serverNote(c.memoHash) ?? noteFor(c.memoHash) ?? "no note"}” · Charge #{id.toString()} · stopped by {who}
+                  {veto?.reason ? `: “${veto.reason}”` : ""}
+                </span>
+                {confirming === id && (
+                  <div className="notice warn" style={{ marginTop: 10 }}>
+                    <strong>Pay this charge anyway?</strong>
+                    <span>
+                      {fmt(c.amount)} tUSD8 goes to {label(b.payTo)} right away. {veto?.reason ? `It was stopped because: “${veto.reason}”. ` : ""}It counts toward this
+                      period&apos;s school limit, and it&apos;s allowed even if it goes over, because this is your decision.
+                    </span>
+                    <div className="actions">
+                      <button type="button" className="btn small" disabled={busy} onClick={() => (setConfirming(null), run((s) => write("approveCharge", [id], s)))}>
+                        Yes, pay it
+                      </button>
+                      <button type="button" className="btn small secondary" disabled={busy} onClick={() => setConfirming(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!live ? (
+                <span className="badge bad" title="A charge from a cancelled billing permission can't be paid, even by you.">
+                  Can&apos;t be paid: billing cancelled
+                </span>
+              ) : !enough ? (
+                <span className="badge warn">Not enough in the allowance</span>
+              ) : (
+                confirming !== id && (
+                  <button type="button" className="btn small secondary" disabled={busy} onClick={() => setConfirming(id)}>
+                    Pay it anyway
+                  </button>
+                )
+              )}
+            </div>
+          );
+        })}
+        {stopped.length === 0 && <p className="fine">No stopped charges.</p>}
+      </div>
+      <StatusNotice status={status} />
     </section>
   );
 }
