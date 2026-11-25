@@ -14,6 +14,7 @@ const links = [
   { href: "/child", label: "Child", emoji: "🎒" },
   { href: "/school", label: "School", emoji: "🏫" },
   { href: "/guardian", label: "Guardian", emoji: "🛡️" },
+  { href: "/judge", label: "For judges", emoji: "🧑‍⚖️" },
 ];
 
 export function Header() {

@@ -18,6 +18,7 @@ is not audited.
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
 | **Guardian evaluation** | [docs/AI_EVAL.md](docs/AI_EVAL.md): 50 frozen test notes; rules + AI vetoed 30/30 bad charges (16/16 prompt injections) with 0/16 genuine charges wrongly vetoed |
+| **For judges** | `/judge` on the live app: watch the guardian and the contract react to simulated problems, no wallet needed |
 | **Plain-English guide** | [docs/GUIDE.md](docs/GUIDE.md): what it is with no crypto jargon, how to test it step by step, and a demo script |
 
 ## What makes Pocket Rails different
@@ -101,7 +102,8 @@ the [Safety model](#safety-model).
 | Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
 | Guardian evaluation (50 frozen notes, rules vs AI vs both) | Done: [docs/AI_EVAL.md](docs/AI_EVAL.md) |
 | Guardian as a Kernel v3.1 smart account with a veto-only session key (ERC-4337, QDay bundler) | Done: 8 unit tests, 10 fork tests on Aevum's EntryPoint and Kernel, live veto through the bundler |
-| Hosted demo | To do |
+| Hosted demo | Ready to deploy on Railway ([docs/HOSTING.md](docs/HOSTING.md)): web app + both agents in one service |
+| Judge page with "See it live" (no wallet) | Done (`/judge`), tested live on Aevum |
 
 ---
 

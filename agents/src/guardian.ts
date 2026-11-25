@@ -13,7 +13,8 @@
  *   3. "unknown" (no note, AI unsure or unavailable) → leave it, report it, let the parent decide
  *
  * Env (agents/.env): RPC_URL, RAILS_ADDRESS, GUARDIAN_KEY, APP_URL, optional AI_REVIEW=1 (uses Anthropic
- * credentials from the environment), POLL_SECONDS (default 5), EXPECTED_PRICE (e.g. 0.3).
+ * credentials from the environment), POLL_SECONDS (default 5), EXPECTED_PRICE (e.g. 0.3),
+ * GUARDIAN_BLOCK_WEEKENDS (default 1; 0 turns the weekend rule off, e.g. for a hosted showcase).
  *
  * Smart-account mode (recommended): set GUARDIAN_ACCOUNT (the guardian's Kernel smart account),
  * GUARDIAN_VALIDATOR (VetoOnlySessionValidator), GUARDIAN_SESSION_KEY (the agent's session key) and
@@ -35,6 +36,8 @@ const validator = (SMART ? env("GUARDIAN_VALIDATOR") : "") as Address;
 const bundlerUrl = env("BUNDLER_URL", "https://bundler.qday.info");
 const POLL = Number(env("POLL_SECONDS", "5")) * 1000;
 const expected = process.env.EXPECTED_PRICE ? parseUnits(process.env.EXPECTED_PRICE, 6) : undefined;
+// The weekend rule can be turned off for a hosted showcase where judges trigger charges on any day.
+const BLOCK_WEEKENDS = (process.env.GUARDIAN_BLOCK_WEEKENDS ?? "1") !== "0";
 
 // Decisions already taken this session (no_action / unknown), so the AI isn't asked again every poll.
 const decided = new Map<bigint, Decision>();
@@ -70,7 +73,7 @@ async function tick() {
   for (const f of open) {
     if (decided.has(f.id)) continue;
     const b = s.billings.get(f.billingId)!;
-    let d = evaluate(f, all, { expectedPrice: expected });
+    let d = evaluate(f, all, { expectedPrice: expected, blockWeekends: BLOCK_WEEKENDS });
 
     if (d.action === "no_action") {
       const note = notes[f.memoHash.toLowerCase()];

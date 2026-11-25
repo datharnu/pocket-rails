@@ -1,0 +1,11 @@
+# Never send secrets or local build output into the image.
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/.next
+web/.cache
+.git
+.githooks
+contracts
+docs
