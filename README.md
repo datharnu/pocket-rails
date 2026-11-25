@@ -130,7 +130,7 @@ flowchart LR
 | tUSD8 | [`0x456569838f1d43009A91ebA4263147Afd7233483`](https://explorer-test.qday.info/address/0x456569838f1d43009A91ebA4263147Afd7233483) |
 
 The explorer's contract verifier isn't working yet, so the deployed source is the exact commit linked here
-(_commit link to be added after the first push_). The deployed bytecode is 19,417 bytes, matching
+[`335f5e6`](https://github.com/datharnu/pocket-rails/tree/335f5e64b223e0ffcc10abab00407ea30c02d585). The deployed bytecode is 19,417 bytes, matching
 `contracts/out/PocketRails.sol/PocketRails.json` at that commit. A live run of the full flow, with every transaction: [docs/DEMO_RUN.md](docs/DEMO_RUN.md). Demo accounts and their roles:
 [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md).
 
