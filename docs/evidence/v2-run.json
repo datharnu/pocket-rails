@@ -1,0 +1,315 @@
+{
+  "run": "PocketRails v2 evidence run",
+  "network": {
+    "name": "QDay Aevum Testnet",
+    "chainId": 44005,
+    "explorer": "https://explorer-test.qday.info"
+  },
+  "contract": "0xB179197A660029b1d96FEF09e3E8515b271E3801",
+  "hostedApp": "https://web-production-b9d9f11e.up.railway.app",
+  "guardianAccount": "0x4D22c96D456CA81892C925bB2044DD28d21a31B0",
+  "vaultId": "2",
+  "accounts": {
+    "parent": "0xD0357C705f8Bade6C3e87691871D55E24fb3a485",
+    "child": "0x97537F4A33C67e6496F651eb00aD24e8cdDEDcf5",
+    "schoolBillingKey": "0xee0A179F5F9E12577cfDCf4dC7DE22D9D9b40203",
+    "canteen": "0x8C6a84C3B1463EB302214D8356280aE218e0368F",
+    "museum": "0x07BbEEDd338eD02B534E10B718416D29E5811256",
+    "submitter": "0xF5348F7Dc6B66DFB8A7aCD345114d0467ac0016E"
+  },
+  "startedAt": "2026-11-25T22:23:41.620Z",
+  "finishedAt": "2026-11-25T22:26:22.415Z",
+  "blocks": {
+    "from": "4123592",
+    "to": "4123748"
+  },
+  "passed": 29,
+  "failed": 0,
+  "steps": [
+    {
+      "feature": "Setup",
+      "step": "Parent opens allowance #2 (canteen approved, 0.5 per payment, 2 a week)",
+      "actor": "parent",
+      "expected": "created",
+      "ok": true,
+      "tx": "0xb737eb9f4dbb73c6da6381d9cbabc80ee32893c4c57be1f221ef5908d4344037",
+      "explorer": "https://explorer-test.qday.info/tx/0xb737eb9f4dbb73c6da6381d9cbabc80ee32893c4c57be1f221ef5908d4344037"
+    },
+    {
+      "feature": "Gas-free top-up (EIP-3009)",
+      "step": "Parent signs a 1.2 tUSD8 top-up; the relayer account submits it",
+      "actor": "relayer account",
+      "expected": "allowance funded, parent pays no gas",
+      "ok": true,
+      "tx": "0x1a1a88424e7af1b3aea3f59169b7031139d7a8cdd15088fed3c934c678d85683",
+      "note": "allowance 1.2 tUSD8, parent's gas balance unchanged",
+      "explorer": "https://explorer-test.qday.info/tx/0x1a1a88424e7af1b3aea3f59169b7031139d7a8cdd15088fed3c934c678d85683"
+    },
+    {
+      "feature": "Child pays on their own",
+      "step": "Child pays the canteen 0.2",
+      "actor": "child (via hosted relayer)",
+      "expected": "paid, no parent needed",
+      "ok": true,
+      "outcome": "allow: Paid.",
+      "tx": "0xbcc37153a36a8b75df7d93665535fc1e561702e003afad1c553fb811d57b56fd",
+      "explorer": "https://explorer-test.qday.info/tx/0xbcc37153a36a8b75df7d93665535fc1e561702e003afad1c553fb811d57b56fd"
+    },
+    {
+      "feature": "Refusals are recorded",
+      "step": "Child tries 0.8 (over the 0.5 per-payment limit)",
+      "actor": "child (via hosted relayer)",
+      "expected": "refused with a reason, no money moves",
+      "ok": true,
+      "outcome": "refuse: This is more than you can spend in one payment.",
+      "reason": 4,
+      "tx": "0x37ba00b25952b073b806d4246b040e33dc6fa0e465e7af4d6dbe144f55a28ae8",
+      "explorer": "https://explorer-test.qday.info/tx/0x37ba00b25952b073b806d4246b040e33dc6fa0e465e7af4d6dbe144f55a28ae8"
+    },
+    {
+      "feature": "Refusals are recorded",
+      "step": "Child tries to pay a place that isn't approved",
+      "actor": "child (via hosted relayer)",
+      "expected": "refused with a reason",
+      "ok": true,
+      "outcome": "refuse: This place isn't on your approved list.",
+      "reason": 3,
+      "tx": "0x80d5d29d3ed76eb447ebda1fa0e56a9d1e7dc5e4e1cc9fde4782f88ff2de8eb8",
+      "explorer": "https://explorer-test.qday.info/tx/0x80d5d29d3ed76eb447ebda1fa0e56a9d1e7dc5e4e1cc9fde4782f88ff2de8eb8"
+    },
+    {
+      "feature": "One-time exception",
+      "step": "Child asks: 0.3 to the museum, “museum trip”",
+      "actor": "child (via hosted relayer)",
+      "expected": "pending",
+      "ok": true,
+      "outcome": "pending: Request sent. Waiting for your parent.",
+      "tx": "0xe6f38a2810ba69c3685e8e070956997134d5209964f93c96206626c36f913c6f",
+      "explorer": "https://explorer-test.qday.info/tx/0xe6f38a2810ba69c3685e8e070956997134d5209964f93c96206626c36f913c6f"
+    },
+    {
+      "feature": "One-time exception",
+      "step": "Parent allows exception #1 once",
+      "actor": "parent",
+      "expected": "allowed, rules unchanged",
+      "ok": true,
+      "tx": "0xb79041e8d19d83c0d72448f83819a682373a02489831e20b13bf0350fbcbfd77",
+      "explorer": "https://explorer-test.qday.info/tx/0xb79041e8d19d83c0d72448f83819a682373a02489831e20b13bf0350fbcbfd77"
+    },
+    {
+      "feature": "One-time exception",
+      "step": "Child pays 0.4 with it (amount changed)",
+      "actor": "child (via hosted relayer)",
+      "expected": "refused: must match exactly",
+      "ok": true,
+      "outcome": "refuse: This payment doesn't match the exception your parent approved.",
+      "reason": 8,
+      "tx": "0x6d44c41df9a366e3417f7e79adaed9a816c50e3641fc83245c72111a9b85c7f7",
+      "explorer": "https://explorer-test.qday.info/tx/0x6d44c41df9a366e3417f7e79adaed9a816c50e3641fc83245c72111a9b85c7f7"
+    },
+    {
+      "feature": "One-time exception",
+      "step": "Child pays exactly 0.3 with it",
+      "actor": "child (via hosted relayer)",
+      "expected": "paid",
+      "ok": true,
+      "outcome": "allow: Paid.",
+      "tx": "0xf81eac74c8a454e4e94649db2d63a10468e2bf919bef2703b7a8461fb1d637a2",
+      "explorer": "https://explorer-test.qday.info/tx/0xf81eac74c8a454e4e94649db2d63a10468e2bf919bef2703b7a8461fb1d637a2"
+    },
+    {
+      "feature": "One-time exception",
+      "step": "Child tries to use it again",
+      "actor": "child (via hosted relayer)",
+      "expected": "refused: used up",
+      "ok": true,
+      "outcome": "refuse: That exception isn't approved, has expired, or was already used.",
+      "reason": 7,
+      "tx": "0x53d6ab8ba2956b2f4783eb91f3a473ddae6e570211f1241b9cafb369a4d4d478",
+      "explorer": "https://explorer-test.qday.info/tx/0x53d6ab8ba2956b2f4783eb91f3a473ddae6e570211f1241b9cafb369a4d4d478"
+    },
+    {
+      "feature": "Relayer can't cheat",
+      "step": "A signed payment with its payee changed is sent to the relayer",
+      "actor": "attacker",
+      "expected": "rejected before any gas is spent",
+      "ok": true,
+      "outcome": "This wasn't signed by the child's key for this allowance. Nothing was sent.",
+      "note": "no transaction"
+    },
+    {
+      "feature": "Relayer can't cheat",
+      "step": "The same signed 0.1 payment is sent twice",
+      "actor": "attacker",
+      "expected": "first paid, second rejected",
+      "ok": true,
+      "outcome": "This exact request was already submitted.",
+      "tx": "0xc1ca00a19531292c89d1787842e124bce83d6bf64862c174ac1d7bf0fc0ff919",
+      "explorer": "https://explorer-test.qday.info/tx/0xc1ca00a19531292c89d1787842e124bce83d6bf64862c174ac1d7bf0fc0ff919"
+    },
+    {
+      "feature": "Money set aside for school",
+      "step": "Parent sets aside 0.5 tUSD8 of 0.6 tUSD8 for school",
+      "actor": "parent",
+      "expected": "child can spend only 0.1",
+      "ok": true,
+      "tx": "0x54524bc966bc609183a2b06f56b0b986b2822408f05f1ebce2d9be9d7dc27944",
+      "explorer": "https://explorer-test.qday.info/tx/0x54524bc966bc609183a2b06f56b0b986b2822408f05f1ebce2d9be9d7dc27944"
+    },
+    {
+      "feature": "Money set aside for school",
+      "step": "Child tries 0.2 (inside the limits, but the rest is set aside)",
+      "actor": "child (via hosted relayer)",
+      "expected": "refused: earmarked for school",
+      "ok": true,
+      "outcome": "refuse: That money is set aside for school costs.",
+      "reason": 13,
+      "tx": "0xbef3e6ca81139bbf24a61b9b6771bbc26b41c760f7de9252b01ae88f942753ba",
+      "explorer": "https://explorer-test.qday.info/tx/0xbef3e6ca81139bbf24a61b9b6771bbc26b41c760f7de9252b01ae88f942753ba"
+    },
+    {
+      "feature": "School billing",
+      "step": "Parent makes the hosted guardian smart account this allowance's guardian",
+      "actor": "parent",
+      "expected": "set",
+      "ok": true,
+      "tx": "0x105e22fa2b80aca8e44e5592bc2f5f94a7ba174c8f8bb5d4a70ba68dd251f3ce",
+      "explorer": "https://explorer-test.qday.info/tx/0x105e22fa2b80aca8e44e5592bc2f5f94a7ba174c8f8bb5d4a70ba68dd251f3ce"
+    },
+    {
+      "feature": "School billing",
+      "step": "Parent grants billing #2: 0.2 per charge, 1 a week, 2-minute veto window, first charge needs approval",
+      "actor": "parent",
+      "expected": "granted",
+      "ok": true,
+      "tx": "0xea7d8ee410ccaca7f789743561fc4ee59cd33dc8eb2e79ee188a417c1866b009",
+      "explorer": "https://explorer-test.qday.info/tx/0xea7d8ee410ccaca7f789743561fc4ee59cd33dc8eb2e79ee188a417c1866b009"
+    },
+    {
+      "feature": "School billing",
+      "step": "School charges 0.1, “Lunch 2026-11-25T22:25 (evidence)” (charge #36)",
+      "actor": "school",
+      "expected": "first charge waits for the parent",
+      "ok": true,
+      "outcome": "Charge received. It waits out the veto window before it can settle.",
+      "tx": "0x7e5446a7fa874830a1007be83b0536ac741df0141e01f890e827f3614f7a9af5",
+      "explorer": "https://explorer-test.qday.info/tx/0x7e5446a7fa874830a1007be83b0536ac741df0141e01f890e827f3614f7a9af5"
+    },
+    {
+      "feature": "School billing",
+      "step": "Parent approves the first charge",
+      "actor": "parent",
+      "expected": "paid from the money set aside",
+      "ok": true,
+      "tx": "0x0e3fafaaf549be9a0c02d14219eaf14effe7c262debec9933600dd6c434dab8a",
+      "note": "set aside 0.5 tUSD8 → 0.4 tUSD8",
+      "explorer": "https://explorer-test.qday.info/tx/0x0e3fafaaf549be9a0c02d14219eaf14effe7c262debec9933600dd6c434dab8a"
+    },
+    {
+      "feature": "School billing",
+      "step": "School asks for 0.5 (above the 0.2 per-charge limit)",
+      "actor": "school",
+      "expected": "refused and recorded",
+      "ok": true,
+      "outcome": "The school asked for more than one charge is allowed to be.",
+      "reason": 9,
+      "tx": "0xf2f136bfa28eb804f82e515008ce6c6bf4089ba808862ab94e83f26493d2f23f",
+      "explorer": "https://explorer-test.qday.info/tx/0xf2f136bfa28eb804f82e515008ce6c6bf4089ba808862ab94e83f26493d2f23f"
+    },
+    {
+      "feature": "AI guardian can only say no",
+      "step": "School sends the same lunch again (charge #37)",
+      "actor": "school",
+      "expected": "waits 2 minutes for a check",
+      "ok": true,
+      "tx": "0x9bdc8e5acdb30229350dce81a07707c70e1a07fa7c91375d82d6173ed4c32204",
+      "explorer": "https://explorer-test.qday.info/tx/0x9bdc8e5acdb30229350dce81a07707c70e1a07fa7c91375d82d6173ed4c32204"
+    },
+    {
+      "feature": "AI guardian can only say no",
+      "step": "The hosted guardian agent reviews it",
+      "actor": "guardian smart account (hosted agent)",
+      "expected": "vetoed by the smart account within the window",
+      "ok": true,
+      "outcome": "vetoed: “Duplicate of charge #36 (same note, already charged)”",
+      "tx": "0x75d440b5828080c9e59259f4d24aada22b3ba36737cd9ff3d95908fad3ad97ef",
+      "note": "ERC-4337 user operation signed by the veto-only session key",
+      "explorer": "https://explorer-test.qday.info/tx/0x75d440b5828080c9e59259f4d24aada22b3ba36737cd9ff3d95908fad3ad97ef"
+    },
+    {
+      "feature": "AI guardian can only say no",
+      "step": "The guardian account tries to approve the charge instead",
+      "actor": "guardian smart account",
+      "expected": "the contract refuses",
+      "ok": true,
+      "outcome": "reverted with NotParent(): only the parent can approve (selector 0x3813fcca)",
+      "note": "simulation, no transaction"
+    },
+    {
+      "feature": "Parent override",
+      "step": "Parent decides the vetoed charge #37 was fine and pays it anyway",
+      "actor": "parent",
+      "expected": "paid; only the parent can do this",
+      "ok": true,
+      "tx": "0x0458fde7b6213044e6a72c2ff309c8ae69518f6e3d76304300cd8d86adeebeb6",
+      "explorer": "https://explorer-test.qday.info/tx/0x0458fde7b6213044e6a72c2ff309c8ae69518f6e3d76304300cd8d86adeebeb6"
+    },
+    {
+      "feature": "Stop anything",
+      "step": "Parent revokes billing #2",
+      "actor": "parent",
+      "expected": "revoked",
+      "ok": true,
+      "tx": "0x11d1fcce5610ad8f2254f6ad2c385c6f95f18d533c17fbd1afdeaa0cdb2a17fc",
+      "explorer": "https://explorer-test.qday.info/tx/0x11d1fcce5610ad8f2254f6ad2c385c6f95f18d533c17fbd1afdeaa0cdb2a17fc"
+    },
+    {
+      "feature": "Stop anything",
+      "step": "School tries to charge after the revoke",
+      "actor": "school",
+      "expected": "refused and recorded",
+      "ok": true,
+      "outcome": "The parent has cancelled this billing permission.",
+      "reason": 12,
+      "tx": "0x1f0a78593fdd8aecbbab7c396dc280084496d10dac36c23023e563186d6d1fb0",
+      "explorer": "https://explorer-test.qday.info/tx/0x1f0a78593fdd8aecbbab7c396dc280084496d10dac36c23023e563186d6d1fb0"
+    },
+    {
+      "feature": "Stop anything",
+      "step": "Parent pauses the child's spending",
+      "actor": "parent",
+      "expected": "paused",
+      "ok": true,
+      "tx": "0x7e515ea60f9af2498a3c2352e2eb630292dde88ce3ae93166369f11abccbc4f1",
+      "explorer": "https://explorer-test.qday.info/tx/0x7e515ea60f9af2498a3c2352e2eb630292dde88ce3ae93166369f11abccbc4f1"
+    },
+    {
+      "feature": "Stop anything",
+      "step": "Child tries to pay 0.1 at the canteen",
+      "actor": "child (via hosted relayer)",
+      "expected": "refused: paused",
+      "ok": true,
+      "outcome": "refuse: Your parent has paused your spending.",
+      "reason": 1,
+      "tx": "0xf4ce020c673b063d84d6dc9a17c39c8ae08904efb67e5ad500453506b4ce4c24",
+      "explorer": "https://explorer-test.qday.info/tx/0xf4ce020c673b063d84d6dc9a17c39c8ae08904efb67e5ad500453506b4ce4c24"
+    },
+    {
+      "feature": "Clean-up",
+      "step": "Parent withdraws the remaining 0.4 tUSD8",
+      "actor": "parent",
+      "expected": "allowance empty",
+      "ok": true,
+      "tx": "0xf12c0862ff2c7456bec7607020341e78055c59b281cbabc47b5ac4af3c07569d",
+      "explorer": "https://explorer-test.qday.info/tx/0xf12c0862ff2c7456bec7607020341e78055c59b281cbabc47b5ac4af3c07569d"
+    },
+    {
+      "feature": "Child pays on their own",
+      "step": "Child's gas balance after the whole run",
+      "actor": "child",
+      "expected": "0: it only signed",
+      "ok": true,
+      "outcome": "0 wei"
+    }
+  ]
+}

@@ -15,7 +15,8 @@ is not audited.
 |---|---|
 | **Live app** | **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)**, with the school billing agent and the guardian smart account running 24/7 on Railway |
 | **Contract** | v2 [`0xB179…3801` on the Aevum explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) (source verified); v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) holds the first live runs |
-| **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
+| **Evidence** | [docs/EVIDENCE.md](docs/EVIDENCE.md): every v2 feature run live through the hosted app and AI guardian, 29/29 checks, each with its transaction |
+| **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): the first runs, and how the guardian smart account was set up |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
 | **Guardian evaluation** | [docs/AI_EVAL.md](docs/AI_EVAL.md): 50 frozen test notes; rules + AI vetoed 30/30 bad charges (16/16 prompt injections) with 0/16 genuine charges wrongly vetoed |
 | **For judges** | **[web-production-b9d9f11e.up.railway.app/judge](https://web-production-b9d9f11e.up.railway.app/judge)**: watch the guardian and the contract react to simulated problems, no wallet needed |
@@ -55,27 +56,29 @@ is not audited.
 
 ## See it in 60 seconds
 
-The transactions below were recorded on v1 ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)); v2 behaves the same for these steps.
+Recorded on v2 through the hosted app and the hosted AI guardian ([docs/EVIDENCE.md](docs/EVIDENCE.md) has all 29 steps):
 
-1. **A school charge goes Pending.** The school agent's meal charge waits out the veto window before it
-   settles: [charge #3](https://explorer-test.qday.info/tx/0xedb7b0bb001b823a05cb344eafd32f95809966dc2298a437faa59b38ea272ff1).
-2. **The guardian vetoes a duplicate.** Run the school agent with `DEMO_SCENARIO=duplicate`
-   ([scenario](agents/src/school-biller.ts#L66)). The guardian veto recorded on Aevum so far is a different
-   scenario, a note that tries to instruct the AI review:
-   [charge](https://explorer-test.qday.info/tx/0x12eb091a5b8db16324899627603553b156d1373cb78ba70b6ca9b864f7d258da),
-   [veto](https://explorer-test.qday.info/tx/0x779643d86942280890ae0f78d572a48f8cb973ef37bb37ebe5f3a103093607bf).
-3. **The parent overrides a wrong veto.** On the parent screen, "Stopped charges" shows who vetoed each charge
-   and why; "Pay it anyway" (with a confirm step) calls `approveCharge`, which pays it now
-   ([test_parentOverridesWrongVeto](contracts/test/PocketRailsBilling.t.sol#L168)).
-4. **An over-cap charge is refused and recorded.** Run the school agent with `DEMO_SCENARIO=overcap`
-   ([scenario](agents/src/school-biller.ts#L77), [test](contracts/test/PocketRailsBilling.t.sol#L78)).
-5. **The child's refused payment shows a plain explanation.** "This is more than you can spend in one
-   payment.": [refusal](https://explorer-test.qday.info/tx/0xb5a88dad7b25a785382590b3275140d85aee0e5f7bc09c207af3e20901870296).
-6. **The parent revokes, and the next payment is refused and recorded.**
-   [revoke](https://explorer-test.qday.info/tx/0x3468f32fb67e8559d66693bfb78c1178e7e145a595d775351b8e1492419a06d2),
-   [refused payment](https://explorer-test.qday.info/tx/0xd8ccd222a21a483290514b26c92d24c55a9b90515d0491bb5aab873fdb0079d2).
+1. **The child pays on their own, with no gas.** [Paid](https://explorer-test.qday.info/tx/0xbcc37153a36a8b75df7d93665535fc1e561702e003afad1c553fb811d57b56fd); the child's account
+   held 0 tQDAY for the whole run.
+2. **A payment that breaks a rule is refused and recorded.** "This is more than you can spend in one payment.":
+   [refusal](https://explorer-test.qday.info/tx/0x37ba00b25952b073b806d4246b040e33dc6fa0e465e7af4d6dbe144f55a28ae8).
+3. **A one-time exception.** The child asks, the parent allows it once, the exact payment goes through and a
+   second use is refused: [request](https://explorer-test.qday.info/tx/0xe6f38a2810ba69c3685e8e070956997134d5209964f93c96206626c36f913c6f), [allow once](https://explorer-test.qday.info/tx/0xb79041e8d19d83c0d72448f83819a682373a02489831e20b13bf0350fbcbfd77),
+   [paid](https://explorer-test.qday.info/tx/0xf81eac74c8a454e4e94649db2d63a10468e2bf919bef2703b7a8461fb1d637a2), [reuse refused](https://explorer-test.qday.info/tx/0x53d6ab8ba2956b2f4783eb91f3a473ddae6e570211f1241b9cafb369a4d4d478).
+4. **Money set aside for school.** The child is refused because the rest is set aside
+   ([refusal, reason 13](https://explorer-test.qday.info/tx/0xbef3e6ca81139bbf24a61b9b6771bbc26b41c760f7de9252b01ae88f942753ba)), and the school's charge is paid from it
+   ([charge paid](https://explorer-test.qday.info/tx/0x0e3fafaaf549be9a0c02d14219eaf14effe7c262debec9933600dd6c434dab8a)).
+5. **The AI guardian vetoes a duplicate on its own, and can't say yes.** [veto](https://explorer-test.qday.info/tx/0x75d440b5828080c9e59259f4d24aada22b3ba36737cd9ff3d95908fad3ad97ef)
+   (an ERC-4337 user operation from the veto-only smart account); its attempt to approve is refused by the
+   contract with `NotParent()`.
+6. **The parent overrides the veto.** [paid anyway](https://explorer-test.qday.info/tx/0x0458fde7b6213044e6a72c2ff309c8ae69518f6e3d76304300cd8d86adeebeb6): only the parent can do this.
+7. **One tap stops it.** [revoke billing](https://explorer-test.qday.info/tx/0x11d1fcce5610ad8f2254f6ad2c385c6f95f18d533c17fbd1afdeaa0cdb2a17fc) → [charge refused](https://explorer-test.qday.info/tx/0x1f0a78593fdd8aecbbab7c396dc280084496d10dac36c23023e563186d6d1fb0);
+   [pause](https://explorer-test.qday.info/tx/0x7e515ea60f9af2498a3c2352e2eb630292dde88ce3ae93166369f11abccbc4f1) → [payment refused](https://explorer-test.qday.info/tx/0xf4ce020c673b063d84d6dc9a17c39c8ae08904efb67e5ad500453506b4ce4c24).
+8. **Gas-free top-up.** The parent only signs an EIP-3009 authorisation; another account submits it:
+   [deposit](https://explorer-test.qday.info/tx/0x1a1a88424e7af1b3aea3f59169b7031139d7a8cdd15088fed3c934c678d85683).
 
-Every step of both live runs: [docs/DEMO_RUN.md](docs/DEMO_RUN.md).
+Or open the [judge page](https://web-production-b9d9f11e.up.railway.app/judge) and send a trick note or a
+duplicate charge yourself: the hosted guardian vetoes it within about 30 seconds.
 
 ## Shared building blocks
 
@@ -323,7 +326,7 @@ same way a direct debit works.
 | Aevum piece | How it's used | Where |
 |---|---|---|
 | **tUSD8** (`0x4565…3483`, 6 decimals) | The only currency. Vault balances are tracked inside PocketRails and backed 1:1 by tUSD8 it holds (checked by an invariant test over 128,000 random calls). | `contracts/src/PocketRails.sol`, `PocketRailsInvariant.t.sol` |
-| **EIP-3009 `receiveWithAuthorization`** on tUSD8 | Gasless top-ups: anyone signs a transfer to PocketRails and anyone submits it. The authorization nonce is `keccak256(contract, vaultId, salt)`, so a relayer can't credit a different vault. Tested against the real tUSD8 on a fork. | `depositWithAuthorization`, `test/fork/PocketRailsFork.t.sol` |
+| **EIP-3009 `receiveWithAuthorization`** on tUSD8 | Gasless top-ups: anyone signs a transfer to PocketRails and anyone submits it. The authorization nonce is `keccak256(contract, vaultId, salt)`, so a relayer can't credit a different vault. Tested against the real tUSD8 on a fork, and run live ([evidence](docs/EVIDENCE.md)). | `depositWithAuthorization`, `test/fork/PocketRailsFork.t.sol` |
 | **EIP-712 signatures on chain 44005** | Children sign payment intents and exception requests; the domain binds them to chain 44005 and this contract. `SignatureChecker` also accepts ERC-1271 smart-account signatures. | `hashPayment`, `packages/pocket-rails/src/intents.ts` |
 | **Shanghai EVM** (no Cancun opcodes) | Compiled with `evm_version = "shanghai"`; `make build` scans the bytecode for Cancun-only opcodes; no transient-storage OpenZeppelin contracts. | `contracts/foundry.toml`, `tools/check-shanghai.mjs` |
 | **Legacy (type 0) transactions** | The relayer, agents and app send legacy transactions, as Aevum recommends. | `web/src/app/api/rails/relay/route.ts`, `agents/src/lib.ts` |

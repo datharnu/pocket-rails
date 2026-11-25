@@ -65,7 +65,8 @@ export default function ParentPage() {
   const [selected, setSelected] = useState<bigint | "new" | null>(null);
   const [view, setView] = useHashView<ParentView>(["overview", "money", "rules", "school", "guardian", "history", "stop"], "overview");
   const showNew = !isDemo && (selected === "new" || (!vaults.isLoading && mine.length === 0));
-  const current = showNew ? undefined : (mine.find((v) => v.id === selected) ?? mine[0]);
+  // Open on the chosen allowance, else the showcase one if it's yours, else the newest.
+  const current = showNew ? undefined : (mine.find((v) => v.id === selected) ?? mine.find((v) => v.id === showcaseVaultId) ?? mine[0]);
   const waiting = useWaiting(current?.id, current?.data);
 
   if (!rails) return <main className="shell"><NotDeployed /></main>;
