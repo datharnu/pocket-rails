@@ -37,6 +37,11 @@ The hosted agents use allowance #1 on PocketRails v2, guarded by the smart accou
 3. Railway finds the `Dockerfile` and `railway.json` and starts a first build. It will fail or be incomplete until the
    variables are set; that's expected.
 
+**Important:** if Railway offered to deploy each folder separately (`web`, `agents`, …), keep one service, delete the
+others, and in that service's **Settings** make sure: **Root Directory** is empty, **Builder** is Dockerfile,
+**Custom Build Command** is empty, **Custom Start Command** is `node tools/start-all.mjs` (Railway may have filled in
+`pnpm --filter web start`, which starts only the web app), and **Watch Paths** is empty.
+
 ## Step 2: add the variables
 
 1. In your own terminal (not in a chat), run:
@@ -71,6 +76,7 @@ Send the link to your developer to add to the README and the submission.
 | Problem | What to do |
 |---|---|
 | Build fails | Open the build logs; send the last 20 lines to your developer. |
+| Only the web app runs (no `[school]` / `[guardian]` lines, charges never vetoed) | Settings → Deploy → Custom Start Command must be `node tools/start-all.mjs`, not `pnpm --filter web start`. |
 | Home page works but the judge page says the live demo isn't switched on | `SCHOOL_KEY`, `DEMO_BILLING_ID` or the billing permission don't match. Re-run `node tools/railway-vars.mjs` and check the values. |
 | "Waiting for the guardian" never finishes | Logs should show `[guardian]` lines. If the AI key is wrong you'll see "AI review unavailable"; if the smart account is out of gas, send it tQDAY. |
 | Children's payments fail with "relayer is out of gas" | Send the Relayer account a little tQDAY. |

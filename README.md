@@ -13,12 +13,12 @@ is not audited.
 
 | Try it | |
 |---|---|
-| **Live app** | _hosted URL coming soon_ (runs locally today: see [Run it locally](#run-it-locally)) |
+| **Live app** | **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)**, with the school billing agent and the guardian smart account running 24/7 on Railway |
 | **Contract** | v2 [`0xB179…3801` on the Aevum explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) (source verified); v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) holds the first live runs |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
 | **Guardian evaluation** | [docs/AI_EVAL.md](docs/AI_EVAL.md): 50 frozen test notes; rules + AI vetoed 30/30 bad charges (16/16 prompt injections) with 0/16 genuine charges wrongly vetoed |
-| **For judges** | `/judge` on the live app: watch the guardian and the contract react to simulated problems, no wallet needed |
+| **For judges** | **[web-production-b9d9f11e.up.railway.app/judge](https://web-production-b9d9f11e.up.railway.app/judge)**: watch the guardian and the contract react to simulated problems, no wallet needed |
 | **Plain-English guide** | [docs/GUIDE.md](docs/GUIDE.md): what it is with no crypto jargon, how to test it step by step, and a demo script |
 
 ## What makes Pocket Rails different
@@ -102,7 +102,7 @@ the [Safety model](#safety-model).
 | Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
 | Guardian evaluation (50 frozen notes, rules vs AI vs both) | Done: [docs/AI_EVAL.md](docs/AI_EVAL.md) |
 | Guardian as a Kernel v3.1 smart account with a veto-only session key (ERC-4337, QDay bundler) | Done: 8 unit tests, 10 fork tests on Aevum's EntryPoint and Kernel, live veto through the bundler |
-| Hosted demo | Ready to deploy on Railway ([docs/HOSTING.md](docs/HOSTING.md)): web app + both agents in one service |
+| Hosted demo | Live on Railway: [web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app). Web app + both agents in one service ([docs/HOSTING.md](docs/HOSTING.md)) |
 | Judge page with "See it live" (no wallet) | Done (`/judge`), tested live on Aevum |
 
 ---
