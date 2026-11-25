@@ -9,7 +9,8 @@
     "school": "tsx --env-file-if-exists=.env src/school-biller.ts",
     "guardian": "tsx --env-file-if-exists=.env src/guardian.ts",
     "test": "tsx --test src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx --env-file-if-exists=.env src/eval.ts"
   },
   "dependencies": {
     "@aevum-kit/aevum": "workspace:*",
