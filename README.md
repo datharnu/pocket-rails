@@ -4,12 +4,72 @@
 Every payment, in either direction, is checked by the same smart contract on QDay Aevum testnet, in tUSD8.
 AI helpers can say no, never yes: every yes traces back to a permission the parent signed.
 
+A parent wants to give a child spending money without approving every payment or handing over a card with no
+limits. The child's school also needs to collect money for meals and trips from that same allowance. Pocket
+Rails keeps the money in a smart contract that checks every payment in both directions: the child pays inside
+rules the parent set, the school bills under a permission the parent granted, and a guardian, which can be an
+AI agent, can stop a school charge but never approve one. It runs on Aevum testnet with test tokens only and
+is not audited.
+
 | Try it | |
 |---|---|
 | **Live app** | _hosted URL coming soon_ (runs locally today: see [Run it locally](#run-it-locally)) |
 | **Contract** | [`0x7d54…40Df` on the Aevum explorer](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) (source verified) |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
+
+## What makes Pocket Rails different
+
+1. **The school pulls charges under a veto window.** The parent grants the school a capped, expiring billing
+   permission. Each charge waits as Pending for at least one minute, the parent or the guardian can veto it
+   in that time, and after the window anyone can settle it.
+   Code: [`requestCharge`](contracts/src/PocketRails.sol#L585), [`vetoCharge`](contracts/src/PocketRails.sol#L624), [`settle`](contracts/src/PocketRails.sol#L662).
+   Tests: [`test_charge_settlesAfterVetoWindow`](contracts/test/PocketRailsBilling.t.sol#L47), [`test_vetoOnlyInsideWindow`](contracts/test/PocketRailsBilling.t.sol#L128),
+   [`test_revokeBilling_pendingChargesFail`](contracts/test/PocketRailsBilling.t.sol#L218).
+2. **A guardian that can only veto.** The guardian key's one special power is `vetoCharge`: it can't approve,
+   raise a limit or move money, and the parent can override a wrongful veto. The guardian agent's AI review
+   treats charge notes as untrusted data and answers "unknown" when unsure, which leaves the charge for the
+   parent.
+   Code: [`agents/`](agents/), [`agents/src/review.ts`](agents/src/review.ts).
+   Tests: [`agents/src/policy.test.ts`](agents/src/policy.test.ts), [`test_guardianCanNeverApprove`](contracts/test/PocketRailsBilling.t.sol#L160),
+   [`test_parentOverridesWrongVeto`](contracts/test/PocketRailsBilling.t.sol#L168).
+3. **Refusals are recorded, not reverted.** A refused payment or charge still succeeds as a transaction, moves
+   no money and records a reason code, so every refusal has a transaction hash anyone can check.
+   See: [Reason codes](#reason-codes). Tests: [`test_refuse_payeeNotApproved`](contracts/test/PocketRails.t.sol#L105),
+   [`test_refuse_overPerPaymentLimit`](contracts/test/PocketRails.t.sol#L109), [`test_charge_overPerChargeCap_refused`](contracts/test/PocketRailsBilling.t.sol#L78).
+4. **Built for a real family situation.** The child sees a plain explanation and a next step when something is
+   refused, and doesn't pay gas because a relayer submits their signed payments. In the business model the
+   school is the paying customer (a hypothesis we haven't validated).
+   See: [child screen](web/src/app/child/page.tsx), [plain-language messages](packages/pocket-rails/src/reasons.ts),
+   [Business model and distribution](#business-model-and-distribution).
+
+## See it in 60 seconds
+
+1. **A school charge goes Pending.** The school agent's meal charge waits out the veto window before it
+   settles: [charge #3](https://explorer-test.qday.info/tx/0xedb7b0bb001b823a05cb344eafd32f95809966dc2298a437faa59b38ea272ff1).
+2. **The guardian vetoes a duplicate.** Run the school agent with `DEMO_SCENARIO=duplicate`
+   ([scenario](agents/src/school-biller.ts#L66)). The guardian veto recorded on Aevum so far is a different
+   scenario, a note that tries to instruct the AI review:
+   [charge](https://explorer-test.qday.info/tx/0x12eb091a5b8db16324899627603553b156d1373cb78ba70b6ca9b864f7d258da),
+   [veto](https://explorer-test.qday.info/tx/0x779643d86942280890ae0f78d572a48f8cb973ef37bb37ebe5f3a103093607bf).
+3. **The parent overrides a wrong veto.** `approveCharge` on a vetoed charge pays it now
+   ([test_parentOverridesWrongVeto](contracts/test/PocketRailsBilling.t.sol#L168)). The parent screen doesn't offer this yet.
+4. **An over-cap charge is refused and recorded.** Run the school agent with `DEMO_SCENARIO=overcap`
+   ([scenario](agents/src/school-biller.ts#L77), [test](contracts/test/PocketRailsBilling.t.sol#L78)).
+5. **The child's refused payment shows a plain explanation.** "This is more than you can spend in one
+   payment.": [refusal](https://explorer-test.qday.info/tx/0xb5a88dad7b25a785382590b3275140d85aee0e5f7bc09c207af3e20901870296).
+6. **The parent revokes, and the next payment is refused and recorded.**
+   [revoke](https://explorer-test.qday.info/tx/0x3468f32fb67e8559d66693bfb78c1178e7e145a595d775351b8e1492419a06d2),
+   [refused payment](https://explorer-test.qday.info/tx/0xd8ccd222a21a483290514b26c92d24c55a9b90515d0491bb5aab873fdb0079d2).
+
+Every step of both live runs: [docs/DEMO_RUN.md](docs/DEMO_RUN.md).
+
+## Shared building blocks
+
+The child side uses familiar spending controls: [approved places, a per-payment limit, a weekly limit and an
+expiry date](#child-pays-push), [one-time exceptions](#one-time-exceptions), [instant revocation](#what-revoking-does-to-things-already-in-flight)
+and [gasless signed intents submitted by a relayer](#relayer-api). The full list of threats and controls is in
+the [Safety model](#safety-model).
 
 > Built for Aevum Builder Challenge #1. **Testnet only, test tokens only, not audited.** No real money,
 > no real children's data and no real merchants. It doesn't replace parental judgment.
