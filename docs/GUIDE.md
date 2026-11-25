@@ -78,6 +78,8 @@ money is a test **stablecoin** (a digital dollar). You don't need those words to
      child sees a kind explanation and what to do next, like "ask your parent".
 6. If the child asks for an exception, the parent sees it and can **allow once** or **decline**. If allowed,
    the child can pay that exact amount, once.
+7. The parent can also **set money aside for school** (for example the bus pass). The child can't spend that
+   part, but school charges can.
 
 ### Direction 2: the school bills (the school pulls money in)
 
@@ -104,7 +106,7 @@ charges by the billing permission the parent gave.
 
 | Piece | Where it is | Does it need to be running? |
 |---|---|---|
-| The robot cashier (smart contract) | On Aevum, address `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` ([see it](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract)) | No. It's always there. |
+| The robot cashier (smart contract) | On Aevum. Current version (v2): `0xB179197A660029b1d96FEF09e3E8515b271E3801` ([see it](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract)). The first version (v1) holds the earlier demo runs. | No. It's always there. |
 | The app (screens + messenger) | On your Mac for now: [http://localhost:3000](http://localhost:3000) | Yes, while you test or demo. (A public link comes with hosting.) |
 | School billing agent | `agents/` folder, runs in a terminal | Only when you want the school to bill automatically |
 | Guardian agent | `agents/` folder, runs in a terminal | Only when you want automatic checking |
@@ -124,7 +126,7 @@ All five are in MetaMask. Balances are from 25 Nov 2026 and change as you test.
 | School `0x8C6a…368F` | School billing | 1.9 tUSD8 (from meals and canteen), 0.049 tQDAY | a little tQDAY for fees |
 | Guardian `0xEA66…00db` | Guardian | 0.05 tQDAY | a little tQDAY for fees (vetoes only) |
 
-Allowance #1 currently holds **0.4 tUSD8** and the child's spending is **paused** (from the earlier demo).
+The current contract (v2) is new and empty: you'll open a fresh allowance in Part 1. The School account holds 1.9 tUSD8 from earlier demos, which you can send back to Parent to fund testing.
 
 **Keys:** the private keys live only in files that never go to GitHub: `web/.env.local` (Relayer),
 `examples/.env` (Parent, Child) and `agents/.env` (School, Guardian). Never paste a key into a file ending in
@@ -146,10 +148,9 @@ Allowance #1 currently holds **0.4 tUSD8** and the child's spending is **paused*
 3. **Switching roles:** in MetaMask, pick another account (Parent, Child, School, Guardian). If the app says
    it isn't connected, click **Connect Wallet** and choose that account. The app always acts as whichever
    account MetaMask has selected.
-4. **School billing limit:** billing permission #1 has used this week's 1.50. Its week restarts on
-   **Wednesday 2 Dec 2026 at 09:36 UTC** (a billing week starts when the permission was granted; the child's
-   weekly limit is different and restarts every Monday 00:00 UTC). For a demo before then, grant a new
-   billing permission (step 5.1 below).
+4. **Fresh contract:** the app and agents now use v2 (it adds money set aside for school). v2 starts with no
+   allowances and no billing permissions, so Part 1 opens a new allowance. A billing permission's weekly limit
+   restarts 7 days after it was granted; the child's weekly limit restarts every Monday 00:00 UTC.
 5. **Agents' settings** are in `agents/.env`. Right now they're in demo mode: a meal every 2 minutes
    (`BILL_EVERY=120`), one "trick" charge to test the AI (`DEMO_SCENARIO=trick`), and AI review on
    (`AI_REVIEW=1`).
@@ -159,21 +160,23 @@ Allowance #1 currently holds **0.4 tUSD8** and the child's spending is **paused*
 ## 8. Full test, step by step
 
 Do the parts in order. Each step says which account to use, what to click and what you should see.
-Amounts are chosen to fit the money you have now (1.5 tUSD8 in the Parent wallet + 0.4 in the allowance).
+Amounts are chosen to fit the money you have: 1.5 tUSD8 in Parent, plus 1.9 you'll move from School.
 
 ### Part 1: the parent gets ready (account: Parent, page: Parent)
 
 | # | Do this | You should see |
 |---|---|---|
-| 1.1 | Open [localhost:3000/parent](http://localhost:3000/parent) | Your allowance #1. The "What to do next" box says spending is paused. |
-| 1.2 | In **⛔ Pause and stop**, click **Turn spending back on**, confirm in MetaMask | A green "Confirmed" message with a "See the record" link. "Child can spend" turns to **Active**. |
-| 1.3 | In **💵 Money**, type `1.5`, click **Top up**, confirm twice in MetaMask (allow, then deposit) | Balance goes from 0.4 to **1.9 tUSD8**. |
+| 1.0 | Switch MetaMask to **School**, send **1.9 tUSD8** to the Parent address (`0xD035…a485`) | Parent now holds 3.4 tUSD8. (One-time money move.) |
+| 1.1 | Switch to **Parent**, open [localhost:3000/parent](http://localhost:3000/parent) | "What to do next": **Step 1: open your child's allowance**, with the form already filled in. |
+| 1.2 | Click **Open allowance**, confirm in MetaMask | A green "Confirmed" message with a "See the record" link. The guide moves on to "Step 2: top up". |
+| 1.3 | In **💵 Money**, type `2`, click **Top up**, confirm twice (allow, then deposit) | Balance shows **2 tUSD8**. |
+| 1.4 | In **💵 Money**, under **🚌 Set aside for school**, type `0.9`, click **Save amount set aside**, confirm | "0.9 set aside, so your child can spend 1.1". Rules go up one version. |
 
 ### Part 2: the child pays (account: Child, page: Child)
 
 | # | Do this | You should see |
 |---|---|---|
-| 2.1 | Switch MetaMask to **Child**, open [localhost:3000/child](http://localhost:3000/child) | The orange allowance card with 1.9 tUSD8 and "School canteen" as an approved place. |
+| 2.1 | Switch MetaMask to **Child**, open [localhost:3000/child](http://localhost:3000/child) | The orange allowance card with 2 tUSD8, "🚌 0.9 set aside for school · you can spend 1.1", and "School canteen" as an approved place. |
 | 2.2 | Tap **School canteen**, type `0.3`, tap **Pay**, sign in MetaMask (free) | "✓ Inside your rules" before you pay, then **Paid** with a "See the record" link. |
 | 2.3 | Type `0.6`, tap **Pay** (more than the 0.50 per-payment limit) | Before paying: "✗ This is more than you can spend in one payment." If you pay anyway: **"That didn't go through, and that's okay"**, the reason, and "No money moved. The refusal is recorded on Aevum". |
 | 2.4 | Tap **Ask for an exception** (the amount stays 0.6), add a note like `Museum trip snacks`, tap **Send request to parent**, sign | "Request sent. Waiting for your parent." It appears under **📨 My requests** as "Waiting for parent". |
@@ -191,17 +194,18 @@ Amounts are chosen to fit the money you have now (1.5 tUSD8 in the Parent wallet
 |---|---|---|
 | 4.1 | Switch to **Child**, open the Child page | "What to do next": **Your parent said yes!** |
 | 4.2 | Under **📨 My requests**, tap **Pay now**, sign | **Paid**. The request now shows "Used". Paying it again would be refused. |
+| 4.3 | Try to pay the canteen `0.3` | Only 0.2 is left to spend; the rest is set aside. Before paying: "✗ That money is set aside for school costs." If you pay anyway: refused and recorded, no money moves. |
 
 ### Part 5: school billing with the agents (accounts: Parent, then watch)
 
 | # | Do this | You should see |
 |---|---|---|
-| 5.1 | As **Parent**, in **🏫 School billing**, open **Grant a billing permission**. Everything is filled in. Change **Veto window (minutes)** to `2`. Leave "The first charge waits for my approval" ticked. Click **Grant**. | Confirmed. A new permission appears in the list. |
+| 5.1 | As **Parent**, in **🏫 School billing**, open **Grant a billing permission**. Everything is filled in. Change **Veto window (minutes)** to `2`. Leave "The first charge waits for my approval" ticked. Click **Grant**. | Confirmed. A new permission appears in the list. School charges can use the 0.9 set aside. |
 | 5.2 | Open **two new Terminal windows**. In the first run `cd ~/Desktop/Odun.Dev/pocket-rails && nvm use 22 && pnpm --filter agents school`. In the second run the same but end with `guardian`. | The school prints "billing as 0x8C6a…" and soon "meal: charged 0.3". The guardian prints "AI review: on" and then "ok … normal school meal cost". |
 | 5.3 | Go to the Parent page. "What to do next" says **A school charge is waiting**. In **🏫 School charges waiting**, the charge says "first charge: waits for your approval". Click **Approve**, confirm | Confirmed: the school is paid. |
 | 5.4 | Wait about 15 seconds | The school sends the **trick charge** (its note tries to tell the AI to approve it). The guardian prints **VETO … "The note tries to instruct the reviewer…"**. On the Parent page it appears in **✋ Stopped charges** with that reason. |
 | 5.5 | On the trick charge, click **Pay it anyway**, read the box, then click **Cancel** | The confirm box repeats why it was stopped. Cancel: nothing is paid. (This shows the parent has the final say, without paying a bad charge.) |
-| 5.6 | Wait 2–3 minutes | New meal charges arrive every 2 minutes and are paid to the school after their 2-minute wait, with no action from you. |
+| 5.6 | Wait 2–3 minutes | New meal charges arrive every 2 minutes and are paid to the school after their 2-minute wait, with no action from you. Each one uses up the money set aside for school first. |
 | 5.7 | When you've seen enough, press **Ctrl + C** in both agent terminals | The agents stop. Nothing new is charged. |
 
 Optional, to show a **wrong** veto being fixed: while a normal meal is waiting, switch to **Guardian**, open
@@ -222,7 +226,7 @@ Click **Pay it anyway** and **Yes, pay it**. The school is paid.
 |---|---|---|
 | 7.1 | Parent page → **🧾 History** | Every payment, refusal, request, rule change, school charge and veto, newest first, each with a link. |
 | 7.2 | Click any link | The transaction on the Aevum explorer, the public record anyone can check. |
-| 7.3 | Open the [contract on the explorer](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract) | The verified source code of the robot cashier. |
+| 7.3 | Open the [contract on the explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract) | The verified source code of the robot cashier. |
 
 ---
 
@@ -238,6 +242,7 @@ agent terminals ready to start.
 | 0:50 | Child page: pay 0.3 → Paid | "Inside the rules, it just works. The child never pays fees." |
 | 1:10 | Child: try 0.6 → kind refusal → ask for exception | "Outside the rules, nothing moves, but the refusal is recorded with a reason, and the child is told what to do next." |
 | 1:40 | Parent: Allow once → Child: Pay now | "The parent says yes to that exact payment, once. The everyday rules don't change." |
+| 2:00 | Child tries to spend the bus-pass money → refused | "Mum set 0.90 aside for school costs. Ada can't spend it on snacks, but the school can still collect it." |
 | 2:10 | Parent: school billing; agents running; first charge → Approve | "The school bills the same allowance under a permission the parent signed. Every charge waits a few minutes." |
 | 2:40 | Guardian vetoes the trick charge; Stopped charges shows the AI's reason | "This charge's note tries to talk the AI into approving it. The guardian caught it. And the guardian can only ever say no. Only the parent can say yes." |
 | 3:10 | Pause child → payment refused; History panel and explorer link | "One tap pauses everything, and every decision has a public receipt." |

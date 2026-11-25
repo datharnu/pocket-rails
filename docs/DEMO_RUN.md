@@ -1,6 +1,9 @@
 # Live demo run on Aevum testnet
 
-Run on 2026-11-25 with `pnpm example demo-flow` against PocketRails
+These runs used PocketRails **v1**. The current contract is v2
+([`0xB179197A660029b1d96FEF09e3E8515b271E3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801)), which adds money set aside for school.
+
+Run on 2026-11-25 with `pnpm example demo-flow` against PocketRails v1
 [`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df),
 using the accounts in [TESTNET_ACCOUNTS.md](TESTNET_ACCOUNTS.md). The child only signed; the relayer paid all
 child gas. Refusals are successful transactions that record a reason code and move no money.

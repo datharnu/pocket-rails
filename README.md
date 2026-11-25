@@ -14,7 +14,7 @@ is not audited.
 | Try it | |
 |---|---|
 | **Live app** | _hosted URL coming soon_ (runs locally today: see [Run it locally](#run-it-locally)) |
-| **Contract** | [`0x7d54…40Df` on the Aevum explorer](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) (source verified) |
+| **Contract** | v2 [`0xB179…3801` on the Aevum explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) (source verified); v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) holds the first live runs |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
 | **Plain-English guide** | [docs/GUIDE.md](docs/GUIDE.md): what it is with no crypto jargon, how to test it step by step, and a demo script |
@@ -25,6 +25,8 @@ is not audited.
    permission. Each charge waits as Pending for at least one minute, the parent or the guardian can veto it
    in that time, and after the window anyone can settle it.
    Code: [`requestCharge`](contracts/src/PocketRails.sol#L585), [`vetoCharge`](contracts/src/PocketRails.sol#L624), [`settle`](contracts/src/PocketRails.sol#L662).
+   The parent can also set money aside for school charges that the child's spending can't touch
+   ([money set aside for school](#money-set-aside-for-school-v2)).
    Tests: [`test_charge_settlesAfterVetoWindow`](contracts/test/PocketRailsBilling.t.sol#L47), [`test_vetoOnlyInsideWindow`](contracts/test/PocketRailsBilling.t.sol#L128),
    [`test_revokeBilling_pendingChargesFail`](contracts/test/PocketRailsBilling.t.sol#L218).
 2. **A guardian that can only veto.** The guardian key's one special power is `vetoCharge`: it can't approve,
@@ -45,6 +47,8 @@ is not audited.
    [Business model and distribution](#business-model-and-distribution).
 
 ## See it in 60 seconds
+
+The transactions below were recorded on v1 ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)); v2 behaves the same for these steps.
 
 1. **A school charge goes Pending.** The school agent's meal charge waits out the veto window before it
    settles: [charge #3](https://explorer-test.qday.info/tx/0xedb7b0bb001b823a05cb344eafd32f95809966dc2298a437faa59b38ea272ff1).
@@ -82,10 +86,10 @@ the [Safety model](#safety-model).
 
 | Part | State |
 |---|---|
-| `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 57 unit and fuzz tests, 3 invariants (128,000 random calls), 2 fork tests on the real tUSD8 |
+| `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 67 unit and fuzz tests, 4 invariants (128,000 random calls), 2 fork tests on the real tUSD8 |
 | TypeScript SDK (`packages/pocket-rails`): ABI, EIP-712 intents, reason codes, outcome decoding | Done |
 | Relayer for child intents (`/api/rails/relay`) and outcome lookup (`/api/rails/tx`) | Done, tested end to end on a local chain (`pnpm example demo-flow`) |
-| Deployment to Aevum testnet | Done and **source verified** on the explorer: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
+| Deployment to Aevum testnet | v2 (adds money set aside for school) done and **source verified**: `0xB179197A660029b1d96FEF09e3E8515b271E3801`. v1, with the first live runs: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
 | Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
 | History cache for the on-chain timeline (`/api/rails/events`) | Done |
 | Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
@@ -196,6 +200,15 @@ vault doesn't hold enough.
 3. During the veto window the parent or the guardian can veto. After it, anyone can settle.
 4. The parent can approve early, or override a wrong veto. The guardian can never approve.
 
+### Money set aside for school (v2)
+
+The parent can set aside part of the balance for school costs, like a bus pass, with `setSchoolReserve`. The
+child's payments, including one-time exceptions, can't use it: a payment that would dip into it is refused and
+recorded with reason 13 ("That money is set aside for school costs."). School charges can use it, and settling
+one uses up the set-aside amount first. It can never be more than the balance, and it shrinks to fit if the
+parent withdraws. Tests: [`contracts/test/PocketRailsReserve.t.sol`](contracts/test/PocketRailsReserve.t.sol) and the
+`invariant_reserveNeverExceedsBalance` invariant.
+
 ### The four outcomes
 
 | Outcome | Where it lives | Meaning |
@@ -221,6 +234,7 @@ vault doesn't hold enough.
 | 10 | OverPeriodLimit | The school has reached this period's billing limit. |
 | 11 | BillingExpired | This billing permission has ended. |
 | 12 | BillingRevoked | The parent has cancelled this billing permission. |
+| 13 | EarmarkedForSchool | That money is set aside for school costs. (v2) |
 
 ---
 
@@ -305,7 +319,7 @@ same way a direct debit works.
 | **`eth_getLogs` limited to 1,000 blocks; ~1 block/second** | History is scanned server-side in parallel 1,000-block chunks, cached to disk, then read incrementally. Current state never depends on logs: it's read from contract views. | `web/src/lib/indexer.ts` |
 | **No WebSocket RPC** | The app and agents poll over HTTPS (transaction status every 1.5 s, state every few seconds). | `web/src/app/api/rails/tx/route.ts`, `agents/` |
 | **Multicall3** | Lists (allowances, requests, charges) are read in one call each. Agents fall back to single reads on chains without it. | `web/src/lib/rails.ts`, `agents/src/lib.ts` |
-| **Explorer (Blockscout)** | Source verified; every screen and log links transactions to it. | [contract page](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract) |
+| **Explorer (Blockscout)** | Source of both versions verified; every screen and log links transactions to it. | [v2 contract page](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract) |
 | **Starter kit** (`qday-io/aevum-starter-kit`) | Foundry setup, `MockUSD8`, Shanghai check, chunked log helper, chain config, Next.js scaffolding, relayer protections. Credited in `NOTICE.md`. | `packages/aevum`, `tools/` |
 | **Faucets** | Demo accounts were funded from the Discord faucet (the web faucet requires mainnet holdings); demo amounts are scaled to one claim. | `docs/PLATFORM_FEEDBACK.md` |
 | **ERC-4337 EntryPoint v0.7 and Kernel v3.1** | Not used yet (see the note below the table) | Roadmap |
@@ -347,16 +361,19 @@ These are plans and hypotheses, not validated results.
 
 | Contract | Address (Aevum testnet, chain 44005) |
 |---|---|
-| PocketRails | [`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df), deployed in block 4072059 by tx [`0xc77c22a4…b728`](https://explorer-test.qday.info/tx/0xc77c22a458fe2fc54d47085ccc195e5e496764174d01b502f03eeb9ffdabb728) |
+| PocketRails **v2** (current) | [`0xB179197A660029b1d96FEF09e3E8515b271E3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801), deployed in block 4084193 by tx [`0x09658ff1…e5a7`](https://explorer-test.qday.info/tx/0x09658ff197ae84ed1e43bd299af97a88f5b3c0c0ab78e8b29c2382292463e5a7) from commit [`e747b93`](https://github.com/datharnu/pocket-rails/tree/e747b93) |
+| PocketRails v1 (first live runs) | [`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df), deployed in block 4072059 by tx [`0xc77c22a4…b728`](https://explorer-test.qday.info/tx/0xc77c22a458fe2fc54d47085ccc195e5e496764174d01b502f03eeb9ffdabb728) |
 | tUSD8 | [`0x456569838f1d43009A91ebA4263147Afd7233483`](https://explorer-test.qday.info/address/0x456569838f1d43009A91ebA4263147Afd7233483) |
 
-**Source verified** on the Aevum explorer (Blockscout) on 2026-11-25: compiler 0.8.24, optimizer 200 runs,
-EVM `shanghai`, 23 source files ([view the verified code](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract)).
-It was deployed from commit [`335f5e6`](https://github.com/datharnu/pocket-rails/tree/335f5e64b223e0ffcc10abab00407ea30c02d585); the contract
-hasn't changed since. Reproduce the verification with:
+**Both versions are source verified** on the Aevum explorer (Blockscout) on 2026-11-25: compiler 0.8.24,
+optimizer 200 runs, EVM `shanghai` ([v2 verified code](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract), [v1 verified code](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract)).
+v2 was deployed from commit [`e747b93`](https://github.com/datharnu/pocket-rails/tree/e747b93) and its deployed bytecode is identical to
+that build apart from immutable values; v1 was deployed from [`335f5e6`](https://github.com/datharnu/pocket-rails/tree/335f5e64b223e0ffcc10abab00407ea30c02d585).
+v2 adds money set aside for school; everything else is unchanged. The contracts have no upgrade path, so v1 stays on
+chain as it was, with the first live runs ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)). Reproduce the verification with:
 
 ```bash
-cd contracts && forge verify-contract 0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df src/PocketRails.sol:PocketRails \
+cd contracts && forge verify-contract 0xB179197A660029b1d96FEF09e3E8515b271E3801 src/PocketRails.sol:PocketRails \
   --chain-id 44005 --verifier blockscout --verifier-url https://explorer-test.qday.info/api/ \
   --constructor-args $(cast abi-encode "constructor(address)" 0x456569838f1d43009A91ebA4263147Afd7233483)
 ```
@@ -368,7 +385,7 @@ cd contracts && forge verify-contract 0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df
 | Who | Function |
 |---|---|
 | Parent | `createVault`, `setRules`, `setPayee`, `setChild`, `revokeChild`, `setGuardian`, `revokeAll`, `withdraw` |
-| Parent | `allowOnce`, `declineException`, `grantBilling`, `revokeBilling`, `approveCharge` |
+| Parent | `allowOnce`, `declineException`, `grantBilling`, `revokeBilling`, `approveCharge`, `setSchoolReserve` (v2) |
 | Anyone | `deposit`, `depositWithAuthorization` (gasless EIP-3009 top-up), `settle` (after the veto window) |
 | Child (signed, anyone submits) | `pay`, `requestException` |
 | School billing key | `requestCharge` |
