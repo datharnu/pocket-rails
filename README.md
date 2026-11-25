@@ -19,7 +19,7 @@ AI helpers can say no, never yes: every yes traces back to a parent's signature.
 | Deployment to Aevum testnet | Done: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
 | Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
 | History cache for the on-chain timeline (`/api/rails/events`) | Done |
-| Guardian agent and school billing agent | To do |
+| Guardian agent and school billing agent (`agents/`) | Done, tested together on a local chain |
 
 ---
 
@@ -119,6 +119,26 @@ Current state (balances, rules, requests, charges) is read straight from the con
 from `/api/rails/events`, a small server-side cache: Aevum makes about 85,000 blocks a day and `eth_getLogs`
 covers at most 1,000 blocks per call, so it scans in parallel once, saves to `web/.cache/`, then only reads
 new blocks.
+
+## Agents
+
+Two small Node agents in `agents/`, each with its own TEST key. Neither can exceed what the contract allows.
+
+| Agent | Run | What it does | What it can't do |
+|---|---|---|---|
+| School billing | `pnpm --filter agents school` | Bills one meal per school day (or every N seconds in demos) on every live permission granted to its key, skipping weekends and staying inside the caps. Never bills the same slot twice: it checks the chain for a charge with the same note first, so restarts are safe. Settles charges once their veto window ends. | Charge more than the caps, shorten the veto window, or pay anyone but the treasury the parent approved |
+| Guardian | `pnpm --filter agents guardian` | Watches every vault that names its key as guardian. Each open charge goes through rules (duplicate note, weekend, price over 1.5× the usual), then optionally an AI review of the note (`AI_REVIEW=1`, Claude `claude-opus-5-5` with structured output limited to `veto` / `no_action` / `unknown`). Vetoes inside the window with a reason; "unknown" means it leaves the charge and reports it. | Approve, raise a limit, or move money: `vetoCharge` is the only thing its key may call |
+
+The AI review treats the note as untrusted data: instructions inside a note are themselves a reason to veto.
+A refusal, an API error or an unreadable answer becomes "unknown", never a guess.
+
+Charge notes live off-chain. The contract stores only `keccak256(note)`; the school agent publishes the text
+to `/api/rails/notes`, which accepts it only if its hash matches, so nobody can attach different text to a
+charge. Children's notes are never sent there.
+
+Demo scenarios (`DEMO_SCENARIO`, sent once after the normal meal): `duplicate` (guardian vetoes),
+`overprice` (guardian vetoes), `trick` (a note that tries to instruct the AI review), `overcap` (the
+contract refuses and records it). Settings: `agents/.env.example`. Rule tests: `pnpm --filter agents test`.
 
 ## Safety model
 

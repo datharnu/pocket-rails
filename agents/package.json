@@ -1,0 +1,26 @@
+{
+  "name": "agents",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Pocket Rails agents: the school billing agent and the guardian agent.",
+  "scripts": {
+    "school": "tsx --env-file-if-exists=.env src/school-biller.ts",
+    "guardian": "tsx --env-file-if-exists=.env src/guardian.ts",
+    "test": "tsx --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aevum-kit/aevum": "workspace:*",
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@pocket-rails/sdk": "workspace:*",
+    "viem": "2.57.12",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

@@ -40,4 +40,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r typecheck
+      - name: Guardian rule tests
+        run: pnpm --filter agents test
       - run: pnpm build
