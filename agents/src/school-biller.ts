@@ -43,10 +43,9 @@ function slotNote(now: bigint): string | undefined {
   return `Lunch (demo slot ${now / secs})`;
 }
 
+/** One attempt per slot: a charge that failed (e.g. the allowance was empty) is not re-sent, so no gas is burned in a loop. */
 function alreadyCharged(s: Snapshot, billingId: bigint, hash: string): boolean {
-  return [...s.charges.values()].some(
-    (ch) => ch.billingId === billingId && ch.memoHash.toLowerCase() === hash.toLowerCase() && ch.status !== ChargeStatus.Failed,
-  );
+  return [...s.charges.values()].some((ch) => ch.billingId === billingId && ch.memoHash.toLowerCase() === hash.toLowerCase());
 }
 
 async function charge(billingId: bigint, amount: bigint, note: string, why: string) {
@@ -111,6 +110,11 @@ async function tick() {
     if (alreadyCharged(s, id, memoHash(note))) continue;
     if (PRICE > b.maxPerCharge) {
       once(`price-${id}`, `permission #${id}: meal price ${usd(PRICE)} is above the parent's per-charge cap ${usd(b.maxPerCharge)}; not billing`);
+      continue;
+    }
+    const balance = s.vaults.get(b.vaultId)?.balance ?? 0n;
+    if (balance < PRICE) {
+      once(`empty-${id}-${note}`, `permission #${id}: allowance #${b.vaultId} holds ${usd(balance)}, less than one meal; not billing until it's topped up`);
       continue;
     }
     const sameperiod = (s.now - b.startAt) / b.period === b.periodIndex;
