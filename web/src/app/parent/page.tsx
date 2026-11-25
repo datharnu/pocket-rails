@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { isAddress, zeroAddress, type Address } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { Explain, Guide } from "@/components/help";
 import { NeedWallet, NotDeployed, StatusNotice, Timeline } from "@/components/ui";
 import { useToken, useTokenBalance } from "@/components/useToken";
 import { demo } from "@/lib/env";
@@ -24,6 +25,7 @@ import {
   useAllCharges,
   useAllExceptions,
   useAllVaults,
+  useServerNotes,
   useHistory,
   useRails,
   useRailsWrite,
@@ -46,30 +48,35 @@ export default function ParentPage() {
   const current = showNew ? undefined : (mine.find((v) => v.id === selected) ?? mine[0]);
 
   if (!rails) return <main className="shell"><NotDeployed /></main>;
-  if (!isConnected) return <main className="shell"><NeedWallet role="parent">The parent account funds the allowance and is the only one who can change rules or say yes.</NeedWallet></main>;
+  if (!isConnected) return <main className="shell"><NeedWallet role="parent" emoji="🧑‍🍼">The parent account funds the allowance and is the only one who can change the rules or say yes.</NeedWallet></main>;
 
   return (
     <main className="shell">
       <section className="page-head">
         <div>
           <p className="eyebrow">Parent</p>
-          <h1>Set the rules once.</h1>
+          <h1>🧑‍🍼 Set the rules once.</h1>
           <p className="lede">Your child pays freely inside them. You only hear about what falls outside.</p>
         </div>
       </section>
 
-      <div className="tabs" role="group" aria-label="Your vaults">
+      <div className="tabs" role="group" aria-label="Your allowances">
         {mine.map((v) => (
           <button key={v.id.toString()} type="button" aria-pressed={current?.id === v.id} onClick={() => setSelected(v.id)}>
-            Vault #{v.id.toString()} · {short(v.data.child)}
+            💰 Allowance #{v.id.toString()} · {short(v.data.child)}
           </button>
         ))}
         <button type="button" aria-pressed={showNew} onClick={() => setSelected("new")}>
-          + New vault
+          + New allowance
         </button>
       </div>
 
-      {vaults.isLoading && <p className="empty">Reading your vaults from Aevum…</p>}
+      {vaults.isLoading && <p className="empty">Loading your allowances…</p>}
+      {showNew && !vaults.isLoading && (
+        <Guide emoji="👇" title="Step 1: open your child's allowance">
+          Paste your child&apos;s wallet address, choose the limits and the places they can pay. In demo mode it&apos;s already filled in.
+        </Guide>
+      )}
       {showNew && !vaults.isLoading && <CreateVault onCreated={(id) => (vaults.refetch(), setSelected(id))} />}
       {current && <VaultDashboard vaultId={current.id} vault={current.data} />}
     </main>
@@ -107,19 +114,21 @@ function CreateVault({ onCreated }: { onCreated: (id: bigint) => void }) {
   }
 
   return (
-    <section className="card form" aria-label="Open a vault">
-      <h2>Open an allowance vault</h2>
-      <p className="sub">Version 1 of the rules. You can change any of this later; every change becomes a new version.</p>
+    <section className="card form" aria-label="Open an allowance">
+      <h2>💰 Open an allowance</h2>
+      <p className="sub">This is version 1 of the rules <Explain term="rules" label="Rules" />. You can change anything later; every change becomes a new version.</p>
       <label className="lbl">
         Child&apos;s wallet address
         <input className="field" value={child} onChange={(e) => setChild(e.target.value.trim())} placeholder="0x…" spellCheck={false} />
         {child && !isAddress(child) && <span className="field-error">That isn&apos;t a valid address.</span>}
       </label>
       <div className="form-row">
-        <label className="lbl">
-          Per payment (tUSD8)
-          <input className="field" inputMode="decimal" value={perPayment} onChange={(e) => setPerPayment(e.target.value)} />
-        </label>
+        <div className="lbl">
+          <span>
+            <label htmlFor="new-per-payment">Per payment (tUSD8</label> <Explain term="tUSD8" />)
+          </span>
+          <input id="new-per-payment" className="field" inputMode="decimal" value={perPayment} onChange={(e) => setPerPayment(e.target.value)} />
+        </div>
         <label className="lbl">
           Per week (tUSD8) <span className="hint">resets Monday 00:00 UTC</span>
           <input className="field" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} />
@@ -131,7 +140,9 @@ function CreateVault({ onCreated }: { onCreated: (id: bigint) => void }) {
       </div>
       {per && week && week < per && <span className="field-error">The weekly limit must be at least the per-payment limit.</span>}
       <div className="stack" style={{ gap: 10 }}>
-        <span className="lbl">Approved places</span>
+        <span className="lbl">
+          <span>Approved places <Explain term="approvedPlace" label="Approved place" /></span>
+        </span>
         {payees.map((p, i) => (
           <div key={i} className="form-row">
             <input className="field text" value={p.label} placeholder="Name, e.g. School canteen" onChange={(e) => setPayees(payees.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
@@ -150,10 +161,10 @@ function CreateVault({ onCreated }: { onCreated: (id: bigint) => void }) {
         </div>
       </div>
       <button type="button" className="btn big" disabled={!valid || busy} onClick={submit}>
-        Open vault
+        Open allowance
       </button>
       <StatusNotice status={status} />
-      <p className="fine">Next: top up the vault. Anyone can top it up, but only you can take money out or change the rules.</p>
+      <p className="fine">Next you&apos;ll top it up. Anyone can add money, but only you can take money out or change the rules.</p>
     </section>
   );
 }
@@ -169,29 +180,30 @@ function VaultDashboard({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
 
   return (
     <>
-      <section className="stats" aria-label="Vault summary">
+      <ParentGuide vaultId={vaultId} vault={vault} spent={spent.data} />
+      <section className="stats" aria-label="Allowance summary">
         <div className="stat">
-          <span className="stat-label">Balance</span>
+          <span className="stat-label">💰 Balance</span>
           <span className="stat-value">
             {fmt(vault.balance)} <small>tUSD8</small>
           </span>
         </div>
         <div className="stat">
-          <span className="stat-label">Spent this week</span>
+          <span className="stat-label">🗓️ Spent this week</span>
           <span className="stat-value">
             {fmt(spent.data)} <small>/ {fmt(vault.rules.weeklyLimit)}</small>
           </span>
           <span className="stat-note">max {fmt(vault.rules.perPaymentLimit)} per payment</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Child access</span>
+          <span className="stat-label">🎒 Child can spend</span>
           <span className="stat-value" style={{ fontSize: 20 }}>
             {!vault.childActive ? <span className="badge bad">Paused</span> : expired ? <span className="badge bad">Ended</span> : <span className="badge good">Active</span>}
           </span>
           <span className="stat-note">until {dateOf(vault.rules.expiresAt)}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Rules version</span>
+          <span className="stat-label">📋 Rules</span>
           <span className="stat-value">v{vault.version.toString()}</span>
           <span className="stat-note">child {short(vault.child)}</span>
         </div>
@@ -207,14 +219,43 @@ function VaultDashboard({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
         <Guardian vaultId={vaultId} vault={vault} />
         <Danger vaultId={vaultId} vault={vault} />
         <section className="card">
-          <h2>History</h2>
-          <p className="sub">Every change, payment, refusal and decision, recorded on Aevum.</p>
+          <h2>🧾 History <Explain term="onChain" label="On Aevum" /></h2>
+          <p className="sub">Every change, payment, refusal and decision, with a public record for each.</p>
           <div style={{ maxHeight: 520, overflowY: "auto" }}>
             <Timeline events={history.data} label={label} money={(v) => `${fmt(BigInt(String(v)))} tUSD8`} loading={history.isLoading} error={history.error?.message} />
           </div>
         </section>
       </div>
     </>
+  );
+}
+
+/** The single most useful next step for this allowance, based on what's happening right now. */
+function ParentGuide({ vaultId, vault, spent }: { vaultId: bigint; vault: Vault; spent?: bigint }) {
+  const exceptions = useAllExceptions();
+  const billings = useAllBillings();
+  const charges = useAllCharges();
+  const go = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const requests = exceptions.items.filter((x) => x.data.vaultId === vaultId && x.data.status === 1 && x.data.epoch === vault.childEpoch).length;
+  const myBillings = new Set(billings.items.filter((b) => b.data.vaultId === vaultId && !b.data.revoked && b.data.epoch === vault.billingEpoch).map((b) => b.id));
+  const waiting = charges.items.filter((c) => myBillings.has(c.data.billingId) && (c.data.status === 1 || c.data.status === 2)).length;
+
+  if (requests > 0)
+    return <Guide emoji="🙋" title={`Your child is asking for ${requests === 1 ? "something" : `${requests} things`}`} action={{ label: "See the request", onClick: go("requests") }}>Allow it once, or decline. Nothing is paid until you decide.</Guide>;
+  if (waiting > 0)
+    return <Guide emoji="🏫" title="A school charge is waiting" action={{ label: "Check it", onClick: go("charges") }}>It will be paid when its waiting time ends, unless you or the guardian stop it.</Guide>;
+  if (!vault.childActive)
+    return <Guide emoji="⏸️" title="Your child's spending is paused" action={{ label: "Turn it back on", onClick: go("stop") }}>Payments are refused (and recorded) until you turn spending back on.</Guide>;
+  if (vault.balance === 0n)
+    return <Guide emoji="💵" title="Step 2: top up the allowance" action={{ label: "Add money", onClick: go("money") }}>Your child can&apos;t pay anything until there&apos;s money in it.</Guide>;
+  if (myBillings.size === 0)
+    return <Guide emoji="🏫" title="Optional: let the school bill meals" action={{ label: "Set up school billing", onClick: go("billing") }}>Choose a limit per charge and per week. Every charge waits a few minutes so it can be stopped.</Guide>;
+  if (vault.guardian === zeroAddress)
+    return <Guide emoji="🛡️" title="Optional: add a guardian" action={{ label: "Add a guardian", onClick: go("guardian") }}>A guardian, even an AI one, checks school charges for you. It can only say no.</Guide>;
+  return (
+    <Guide emoji="🌟" title="All set">
+      Your child can pay approved places on their own{spent !== undefined ? ` (${fmt(spent)} of ${fmt(vault.rules.weeklyLimit)} spent this week)` : ""}. You&apos;ll see requests and school charges here.
+    </Guide>
   );
 }
 
@@ -225,9 +266,9 @@ function Requests({ vaultId, vault, label }: { vaultId: bigint; vault: Vault; la
   const pending = exceptions.items.filter((x) => x.data.vaultId === vaultId && x.data.status === 1 && x.data.epoch === vault.childEpoch);
   if (pending.length === 0 && status.state === "idle") return null;
   return (
-    <section className="card info" aria-label="Requests from your child">
-      <h2>Requests from your child</h2>
-      <p className="sub">Allowing one covers only that exact place, amount and note, once, for 24 hours. Your standing rules don&apos;t change.</p>
+    <section id="requests" className="card info" aria-label="Requests from your child">
+      <h2>🙋 Requests from your child</h2>
+      <p className="sub">“Allow once” covers only that exact place, amount and note, once, for 24 hours <Explain term="exception" label="Exception" />. Your everyday rules don&apos;t change.</p>
       <div className="list">
         {pending.map(({ id, data: x }) => (
           <div key={id.toString()} className="item">
@@ -263,11 +304,12 @@ function SchoolCharges({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
   const { status, run, busy } = useAction();
   const myBillings = new Map(billings.items.filter((b) => b.data.vaultId === vaultId).map((b) => [b.id, b.data]));
   const open = charges.items.filter((c) => myBillings.has(c.data.billingId) && (c.data.status === 1 || c.data.status === 2));
+  const serverNote = useServerNotes(open.map((c) => c.data.memoHash));
   if (open.length === 0 && status.state === "idle") return null;
   return (
-    <section className="card info" aria-label="School charges waiting">
-      <h2>School charges waiting</h2>
-      <p className="sub">Charges settle on their own when the window ends, unless you or the guardian veto. You can also approve early.</p>
+    <section id="charges" className="card info" aria-label="School charges waiting">
+      <h2>🏫 School charges waiting</h2>
+      <p className="sub">Each charge is paid automatically when its waiting time ends <Explain term="vetoWindow" label="Waiting time" />, unless you or the guardian stop it. You can also approve early.</p>
       <div className="list">
         {open.map(({ id, data: c }) => {
           const b = myBillings.get(c.billingId)!;
@@ -280,7 +322,7 @@ function SchoolCharges({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
                   {fmt(c.amount)} tUSD8 to {label(b.payTo)}
                 </span>
                 <span className="item-sub">
-                  Charge #{id.toString()} ·{" "}
+                  “{serverNote(c.memoHash) ?? noteFor(c.memoHash) ?? "no note"}” · Charge #{id.toString()} ·{" "}
                   {awaiting ? "first charge: waits for your approval" : windowOpen ? `settles in ${timeLeft(c.settleAfter)} unless vetoed` : "veto window over: ready to settle"}
                 </span>
               </div>
@@ -336,10 +378,10 @@ function Money({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
   }
 
   return (
-    <section className="card form">
-      <h2>Money</h2>
+    <section id="money" className="card form">
+      <h2>💵 Money</h2>
       <p className="sub">
-        Your wallet: {fmt(wallet.data)} tUSD8 · Vault: {fmt(vault.balance)} tUSD8
+        Your wallet: {fmt(wallet.data)} tUSD8 · Allowance: {fmt(vault.balance)} tUSD8
       </p>
       <label className="lbl">
         Amount (tUSD8)
@@ -380,7 +422,7 @@ function Rules({ vaultId, vault, places, history }: { vaultId: bigint; vault: Va
 
   return (
     <section className="card form">
-      <h2>Rules (v{vault.version.toString()})</h2>
+      <h2>📋 Rules, version {vault.version.toString()} <Explain term="rules" label="Rules" /></h2>
       <div className="form-row">
         <label className="lbl">
           Per payment
@@ -401,10 +443,12 @@ function Rules({ vaultId, vault, places, history }: { vaultId: bigint; vault: Va
         disabled={!per || !week || week < per || busy}
         onClick={() => per && week && run((s) => write("setRules", [vaultId, { perPaymentLimit: per, weeklyLimit: week, expiresAt: nowSec() + days(ttl) }], s))}
       >
-        Save as new version
+        Save as a new version
       </button>
 
-      <span className="lbl">Approved places</span>
+      <span className="lbl">
+        <span>Approved places <Explain term="approvedPlace" label="Approved place" /></span>
+      </span>
       <div className="list">
         {current.map((p) => (
           <div key={p.address} className="item">
@@ -451,9 +495,9 @@ function SchoolBilling({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
   const mine = billings.items.filter((b) => b.data.vaultId === vaultId);
 
   return (
-    <section className="card form">
-      <h2>School billing</h2>
-      <p className="sub">The school can request charges up to these caps. Each one waits out the veto window before it can settle.</p>
+    <section id="billing" className="card form">
+      <h2>🏫 School billing <Explain term="billing" label="School billing" /></h2>
+      <p className="sub">Let the school request charges up to limits you choose. Each charge waits a few minutes so it can be stopped.</p>
       <div className="list">
         {mine.map(({ id, data: b }) => {
           const dead = b.revoked || b.epoch !== vault.billingEpoch;
@@ -558,9 +602,9 @@ function Guardian({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
   const [g, setG] = useState<string>(demo.guardian ?? "");
   const hasGuardian = vault.guardian !== zeroAddress;
   return (
-    <section className="card form">
-      <h2>Guardian</h2>
-      <p className="sub">A helper or AI agent that reviews school charges. It can veto inside the window. It can never approve, raise a limit or move money.</p>
+    <section id="guardian" className="card form">
+      <h2>🛡️ Guardian <Explain term="guardian" label="Guardian" /></h2>
+      <p className="sub">A helper, or an AI agent, that checks school charges and stops the wrong ones. It can never approve, raise a limit or move money.</p>
       <p>{hasGuardian ? <>Current: <code>{vault.guardian}</code></> : "No guardian set."}</p>
       <input className="field" value={g} spellCheck={false} onChange={(e) => setG(e.target.value.trim())} placeholder="0x…" />
       <div className="actions">
@@ -583,9 +627,9 @@ function Danger({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
   const { status, run, busy } = useAction();
   const [confirmAll, setConfirmAll] = useState(false);
   return (
-    <section className="card form">
-      <h2>Pause and revoke</h2>
-      <p className="sub">Takes effect in the next block. Funds stay in the vault for you to withdraw.</p>
+    <section id="stop" className="card form">
+      <h2>⛔ Pause and stop</h2>
+      <p className="sub">Works within seconds. The money stays in the allowance for you to withdraw.</p>
       <div className="actions">
         {vault.childActive ? (
           <button type="button" className="btn warn" disabled={busy} onClick={() => run((s) => write("revokeChild", [vaultId], s))}>

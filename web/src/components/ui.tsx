@@ -43,7 +43,7 @@ export function StatusNotice({ status, onAskException }: { status: Status; onAsk
           <span className="spinner" aria-hidden="true" /> {status.text}
         </strong>
         <span className="fine">
-          Not confirmed yet, so nothing is assumed. {status.hash && <TxLink hash={status.hash} label="View transaction" />}
+          Waiting for the blockchain to confirm. We won&apos;t show a result until it does. {status.hash && <TxLink hash={status.hash} label="Track it" />}
         </span>
       </div>
     );
@@ -58,11 +58,11 @@ export function StatusNotice({ status, onAskException }: { status: Status; onAsk
     const r = explainReason(o.reason);
     return (
       <div className="notice bad" role="alert">
-        <strong>Not paid: {r.message}</strong>
+        <strong>That didn&apos;t go through, and that&apos;s okay. {r.message}</strong>
         <span>{r.nextStep}</span>
         <div className="row-between">
           <span className="fine">
-            Refusal recorded on-chain (reason {o.reason}, {r.name}). No money moved. <TxLink hash={o.hash} label="Proof" />
+            No money moved. The refusal is recorded on Aevum (reason {o.reason}). <TxLink hash={o.hash} label="See the record" />
           </span>
           {r.canAskException && onAskException && (
             <button type="button" className="btn small secondary" onClick={onAskException}>
@@ -78,15 +78,18 @@ export function StatusNotice({ status, onAskException }: { status: Status; onAsk
     <div className={`notice ${tone}`} role="status">
       <strong>{o.message}</strong>
       <span className="fine">
-        Confirmed in block {o.blockNumber.toString()}. <TxLink hash={o.hash} label="Proof" />
+        Confirmed on Aevum. <TxLink hash={o.hash} label="See the record" />
       </span>
     </div>
   );
 }
 
-export function NeedWallet({ role, children }: { role: string; children?: ReactNode }) {
+export function NeedWallet({ role, emoji = "👛", children }: { role: string; emoji?: string; children?: ReactNode }) {
   return (
     <div className="card center-card">
+      <span style={{ fontSize: 44, lineHeight: 1 }} aria-hidden="true">
+        {emoji}
+      </span>
       <h2>Connect the {role} wallet</h2>
       <p className="sub">{children ?? "Use the account you set up for this role."}</p>
       <ConnectButton />
@@ -98,14 +101,14 @@ export function NotDeployed() {
   const { net } = useNetwork();
   return (
     <div className="notice warn">
-      <strong>PocketRails isn&apos;t configured on {net.label}.</strong>
+      <strong>Pocket Rails isn&apos;t set up on {net.label} yet.</strong>
       <span>Set NEXT_PUBLIC_RAILS_{net.key.toUpperCase()} in web/.env.local and restart the app.</span>
     </div>
   );
 }
 
 const EVENT_TEXT: Record<string, (a: HistoryEvent["args"], label: (x: string) => string, money: (x: unknown) => string) => string> = {
-  VaultCreated: () => "Vault opened",
+  VaultCreated: () => "Allowance opened",
   Deposited: (a, l, m) => `Topped up ${m(a.amount)} from ${l(String(a.from))}`,
   Withdrawn: (a, _l, m) => `Parent withdrew ${m(a.amount)}`,
   RulesChanged: (a, _l, m) => `Rules v${a.version}: ${m(a.perPaymentLimit)} per payment, ${m(a.weeklyLimit)} a week`,
@@ -155,7 +158,7 @@ export function Timeline({
   error?: string;
 }) {
   if (error) return <p className="empty">{error}</p>;
-  if (loading && !events) return <p className="empty">Reading history from Aevum…</p>;
+  if (loading && !events) return <p className="empty">Loading the history from Aevum…</p>;
   if (!events?.length) return <p className="empty">Nothing yet.</p>;
   return (
     <ol className="timeline">

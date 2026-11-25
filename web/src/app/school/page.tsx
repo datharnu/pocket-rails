@@ -3,6 +3,7 @@
 import { explainReason, memoHash } from "@pocket-rails/sdk";
 import { useState } from "react";
 import { useAccount } from "wagmi";
+import { Explain, Guide } from "@/components/help";
 import { NeedWallet, NotDeployed, StatusNotice } from "@/components/ui";
 import { rememberNote, noteFor } from "@/lib/childActions";
 import {
@@ -18,6 +19,7 @@ import {
   useAllVaults,
   useRails,
   useRailsWrite,
+  useServerNotes,
   type Billing,
 } from "@/lib/rails";
 import { useAction } from "@/lib/useAction";
@@ -31,22 +33,27 @@ export default function SchoolPage() {
   const epochOf = new Map(vaults.items.map((v) => [v.id, v.data.billingEpoch]));
 
   if (!rails) return <main className="shell"><NotDeployed /></main>;
-  if (!isConnected) return <main className="shell"><NeedWallet role="school billing">Use the account the parent granted billing to.</NeedWallet></main>;
+  if (!isConnected) return <main className="shell"><NeedWallet role="school" emoji="🏫">Use the account the parent gave billing permission to.</NeedWallet></main>;
 
   return (
     <main className="shell">
       <section className="page-head">
         <div>
           <p className="eyebrow">School</p>
-          <h1>Bill inside the parent&apos;s caps.</h1>
-          <p className="lede">Each charge waits out the parent&apos;s veto window, then anyone can settle it. Charges over the caps are refused and recorded.</p>
+          <h1>🏫 Bill within the parent&apos;s limits.</h1>
+          <p className="lede">Each charge waits a few minutes so the family can check it, then it&apos;s paid. Charges over the limits are refused and recorded.</p>
         </div>
       </section>
-      {billings.isLoading && <p className="empty">Reading billing permissions…</p>}
+      {billings.isLoading && <p className="empty">Loading your billing permissions…</p>}
+      {!billings.isLoading && mine.length > 0 && (
+        <Guide emoji="🍽️" title="Send a charge, then settle it when the wait is over">
+          Each charge waits for the family&apos;s check <Explain term="vetoWindow" label="Waiting time" />. When it shows “Settle”, tap it to collect the payment. The billing agent can do both for you automatically.
+        </Guide>
+      )}
       {!billings.isLoading && mine.length === 0 && (
         <div className="card">
-          <h2>No billing permissions for this account</h2>
-          <p className="sub">A parent grants one from the Parent view, using this address as the school billing key:</p>
+          <h2>No billing permission yet</h2>
+          <p className="sub">A parent needs to give this account permission first <Explain term="billing" label="School billing" />. They&apos;ll need this address:</p>
           <code className="mono" style={{ overflowWrap: "anywhere" }}>{address}</code>
         </div>
       )}
@@ -66,29 +73,30 @@ function BillingCard({ billingId, b, live }: { billingId: bigint; b: Billing; li
   const amount = parseAmount(amountText);
   const expired = nowSec() >= b.expiresAt;
   const list = charges.items.filter((c) => c.data.billingId === billingId).slice(0, 12);
+  const serverNote = useServerNotes(list.map((c) => c.data.memoHash));
 
   return (
     <section className="card form" aria-label={`Billing permission ${billingId}`}>
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <h2>
-          Vault #{b.vaultId.toString()} · permission #{billingId.toString()}
+          💰 Allowance #{b.vaultId.toString()} · permission #{billingId.toString()}
         </h2>
         <span className={`badge ${!live ? "bad" : expired ? "bad" : "good"}`}>{!live ? "Revoked" : expired ? "Expired" : "Active"}</span>
       </div>
       <div className="stats">
         <div className="stat">
-          <span className="stat-label">Per charge</span>
+          <span className="stat-label">💳 Max per charge</span>
           <span className="stat-value">{fmt(b.maxPerCharge)}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">This period</span>
+          <span className="stat-label">🗓️ Used this period</span>
           <span className="stat-value">
             {fmt(b.periodUsed)} <small>/ {fmt(b.maxPerPeriod)}</small>
           </span>
           <span className="stat-note">period: {Number(b.period) / 86400} days</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Veto window</span>
+          <span className="stat-label">⏳ Waiting time</span>
           <span className="stat-value">{Number(b.vetoWindow) / 60} min</span>
           <span className="stat-note">until {dateOf(b.expiresAt)}</span>
         </div>
@@ -100,7 +108,9 @@ function BillingCard({ billingId, b, live }: { billingId: bigint; b: Billing; li
           <input className="field" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} />
         </label>
         <label className="lbl">
-          Note <span className="hint">(only a fingerprint goes on-chain)</span>
+          <span>
+            What&apos;s it for? <span className="hint">(e.g. “Lunch 26 Nov”)</span>
+          </span>
           <input className="field text" value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
@@ -108,14 +118,20 @@ function BillingCard({ billingId, b, live }: { billingId: bigint; b: Billing; li
         type="button"
         className="btn"
         disabled={!amount || busy}
-        onClick={() => amount && (rememberNote(note), run((s) => write("requestCharge", [billingId, amount, memoHash(note)], s)))}
+        onClick={() =>
+          amount &&
+          (rememberNote(note),
+          // Publish the note text so the family's screens and the guardian can read it (only its hash goes on-chain).
+          fetch("/api/rails/notes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: note }) }).catch(() => undefined),
+          run((s) => write("requestCharge", [billingId, amount, memoHash(note)], s)))
+        }
       >
         Send charge
       </button>
       {b.firstChargeNeedsApproval && !b.hasSettled && <p className="fine">The parent asked to approve the first charge themselves, so it won&apos;t settle on its own.</p>}
       <StatusNotice status={status} />
 
-      <span className="lbl">Charges</span>
+      <span className="lbl">Your charges</span>
       <div className="list">
         {list.map(({ id, data: c }) => {
           const ready = c.status === 1 && nowSec() >= c.settleAfter;
@@ -124,7 +140,7 @@ function BillingCard({ billingId, b, live }: { billingId: bigint; b: Billing; li
             <div key={id.toString()} className="item">
               <div className="item-main">
                 <span className="item-title">
-                  #{id.toString()} · {fmt(c.amount)} tUSD8 · {noteFor(c.memoHash) ?? "note not on this device"}
+                  #{id.toString()} · {fmt(c.amount)} tUSD8 · {serverNote(c.memoHash) ?? noteFor(c.memoHash) ?? "no note"}
                 </span>
                 <span className="item-sub">
                   {c.status === 1 && !ready && `Settles in ${timeLeft(c.settleAfter)} unless vetoed`}

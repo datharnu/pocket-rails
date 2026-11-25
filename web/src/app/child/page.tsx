@@ -4,6 +4,7 @@ import { explainReason, memoHash, pocketRailsAbi, Reason } from "@pocket-rails/s
 import { useEffect, useMemo, useState } from "react";
 import { isAddress, type Address } from "viem";
 import { useAccount, useReadContract } from "wagmi";
+import { Explain, Guide } from "@/components/help";
 import { NeedWallet, NotDeployed, StatusNotice, Timeline, type Status } from "@/components/ui";
 import { noteFor, useChildActions } from "@/lib/childActions";
 import {
@@ -50,18 +51,19 @@ export default function ChildPage() {
     return (
       <main className="shell">
         <div className="phone">
-          <NeedWallet role="child">Your allowance lives in the account your parent set up for you. You never need gas.</NeedWallet>
+          <NeedWallet role="child" emoji="🎒">Use the account your parent set up for you. You never pay any fees.</NeedWallet>
         </div>
       </main>
     );
   }
-  if (vaults.isLoading) return <main className="shell"><div className="phone"><p className="empty">Looking for your allowance…</p></div></main>;
+  if (vaults.isLoading) return <main className="shell"><div className="phone"><p className="empty">Finding your allowance…</p></div></main>;
   if (!current) {
     return (
       <main className="shell">
         <div className="phone card">
+          <span style={{ fontSize: 44 }} aria-hidden="true">🔎</span>
           <h2>No allowance for this account yet</h2>
-          <p className="sub">Ask your parent to open one in the Parent view with this address:</p>
+          <p className="sub">Ask your parent to open one for you. They&apos;ll need this address:</p>
           <code className="mono" style={{ overflowWrap: "anywhere" }}>{address}</code>
           <button type="button" className="btn small secondary" onClick={() => address && navigator.clipboard?.writeText(address)}>
             Copy address
@@ -166,9 +168,16 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
 
   return (
     <>
+      <ChildGuide
+        paused={!vault.childActive}
+        ended={expired}
+        empty={vault.balance === 0n}
+        yes={myRequests.some(({ data: x }) => x.status === 2 && x.epoch === vault.childEpoch && nowSec() <= x.validUntil)}
+        waiting={myRequests.some(({ data: x }) => x.status === 1 && x.epoch === vault.childEpoch)}
+      />
       <section className="wallet-card" aria-label="Your allowance">
         <div className="row-between">
-          <span>Allowance #{vaultId.toString()}</span>
+          <span>🎒 My allowance</span>
           <span>{!vault.childActive ? "⏸ Paused by parent" : expired ? "Ended" : `Until ${dateOf(vault.rules.expiresAt)}`}</span>
         </div>
         <span className="big">
@@ -187,20 +196,20 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
 
       <section className="card form" aria-label={askMode ? "Ask for an exception" : "Pay"}>
         <div className="row-between" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2>{askMode ? "Ask your parent" : "Pay"}</h2>
+          <h2>{askMode ? "🙋 Ask your parent" : "💸 Pay"}</h2>
           {askMode && (
             <button type="button" className="btn small ghost" onClick={() => setAskMode(false)}>
               Back to paying
             </button>
           )}
         </div>
-        {askMode && <p className="sub">Your parent can allow this exact payment once. Nothing is paid until they do.</p>}
+        {askMode && <p className="sub">Your parent can say yes to this exact payment, once <Explain term="exception" label="Exception" />. Nothing is paid until they do.</p>}
 
         <div className="places" role="group" aria-label="Approved places">
           {places.map((p) => (
             <button key={p.address} type="button" className="place" aria-pressed={sameAddr(p.address, payee)} onClick={() => setPayee(p.address)}>
               <span>{p.label}</span>
-              <small>Approved</small>
+              <small>✓ Approved</small>
             </button>
           ))}
           {places.length === 0 && <p className="fine">{history.isLoading ? "Loading your places…" : "No approved places yet."}</p>}
@@ -226,7 +235,9 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
           </div>
         )}
         <label className="lbl">
-          Note <span className="hint">(stays on your device; only a fingerprint goes on-chain)</span>
+          <span>
+            What&apos;s it for? <span className="hint">(optional, stays on your phone)</span>
+          </span>
           <input className="field text" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} placeholder={askMode ? "What is it for?" : "Lunch"} />
         </label>
 
@@ -248,14 +259,14 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
         <StatusNotice status={status} onAskException={() => (setAskMode(true), setStatus({ state: "idle" }))} />
         {!askMode && (
           <button type="button" className="btn small ghost" onClick={() => (setAskMode(true), setStatus({ state: "idle" }))}>
-            Need something outside your rules? Ask for an exception
+            Need something else? Ask your parent
           </button>
         )}
       </section>
 
       {myRequests.length > 0 && (
         <section className="card">
-          <h2>Your requests</h2>
+          <h2>📨 My requests</h2>
           <div className="list" style={{ marginTop: 12 }}>
             {myRequests.map(({ id, data: x }) => {
               const statusName = ExceptionStatus[x.status] ?? "Unknown";
@@ -289,7 +300,7 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
       )}
 
       <section className="card">
-        <h2>Activity</h2>
+        <h2>🧾 What happened</h2>
         <div style={{ marginTop: 12 }}>
           <Timeline
             events={history.data?.filter((e) => ["Paid", "Refused", "ExceptionRequested", "ExceptionDecided", "Deposited"].includes(e.eventName)).slice(0, 15)}
@@ -301,5 +312,19 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
         </div>
       </section>
     </>
+  );
+}
+
+/** One friendly line about what the child can do right now. */
+function ChildGuide({ paused, ended, empty, yes, waiting }: { paused: boolean; ended: boolean; empty: boolean; yes: boolean; waiting: boolean }) {
+  if (paused) return <Guide emoji="⏸️" title="Your spending is paused">Your parent has paused it for now. Talk to them to turn it back on.</Guide>;
+  if (ended) return <Guide emoji="📅" title="Your allowance has ended">Ask your parent to renew it.</Guide>;
+  if (yes) return <Guide emoji="🎉" title="Your parent said yes!">Find it under “My requests” and tap “Pay now”.</Guide>;
+  if (empty) return <Guide emoji="🪫" title="Your allowance is empty">Ask your parent to top it up.</Guide>;
+  if (waiting) return <Guide emoji="⏳" title="Waiting for your parent">You&apos;ll see their answer under “My requests”.</Guide>;
+  return (
+    <Guide emoji="👋" title="Pick a place, choose an amount, tap Pay">
+      You never pay fees <Explain term="gas" label="Fees" />. If something isn&apos;t allowed, we&apos;ll tell you why and how to ask.
+    </Guide>
   );
 }

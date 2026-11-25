@@ -247,3 +247,18 @@ export function useRailsWrite() {
     [config, address, rails, chainId],
   );
 }
+
+/** Note texts published to the app's notes service (school charges), by memo hash. */
+export function useServerNotes(hashes: string[]) {
+  const key = [...new Set(hashes.map((h) => h.toLowerCase()))].sort();
+  const q = useQuery({
+    queryKey: ["notes", key.join(",")],
+    enabled: key.length > 0,
+    staleTime: 10_000,
+    queryFn: async () => {
+      const res = await fetch(`/api/rails/notes?hashes=${key.join(",")}`);
+      return ((await res.json()) as { notes?: Record<string, string> }).notes ?? {};
+    },
+  });
+  return (hash: string): string | undefined => q.data?.[hash.toLowerCase()];
+}
