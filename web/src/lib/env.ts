@@ -82,3 +82,12 @@ export const demo = {
   school: address(process.env.NEXT_PUBLIC_DEMO_SCHOOL),
   guardian: address(process.env.NEXT_PUBLIC_DEMO_GUARDIAN),
 };
+
+/**
+ * The showcase allowance: shown read-only ("demo mode") on every role page when no wallet is connected,
+ * and on the homepage. It's real testnet data, kept running by the hosted school and guardian agents.
+ */
+export const showcaseVaultId: bigint = (() => {
+  const v = process.env.NEXT_PUBLIC_SHOWCASE_VAULT?.trim();
+  return v && /^\d+$/.test(v) && v !== "0" ? BigInt(v) : 1n;
+})();

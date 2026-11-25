@@ -153,7 +153,7 @@ export default function JudgePage() {
             </span>
           </div>
           <div className="stat">
-            <span className="stat-label">🛡️ Guardian</span>
+            <span className="stat-label">🚦 Guardian</span>
             <span className="stat-note">
               Smart account{" "}
               {net.hasExplorer && info.data?.guardian ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useReadOnly } from "@/lib/viewMode";
 import type { Hash } from "viem";
 import type { Status } from "@/components/ui";
 import type { TxResult } from "@/lib/rails";
@@ -22,6 +23,8 @@ export function useAction() {
       return false;
     }
   }, []);
-  const busy = status.state === "signing" || status.state === "unknown";
+  // In demo mode (no wallet) every action is locked: the buttons show, but can't be pressed.
+  const readOnly = useReadOnly();
+  const busy = readOnly || status.state === "signing" || status.state === "unknown";
   return { status, run, busy, reset: () => setStatus({ state: "idle" }) };
 }

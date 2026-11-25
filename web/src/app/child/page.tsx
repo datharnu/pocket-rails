@@ -5,7 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { isAddress, type Address } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { Explain, Guide } from "@/components/help";
-import { NeedWallet, NotDeployed, StatusNotice, Timeline, type Status } from "@/components/ui";
+import { PanelHead, DemoBanner } from "@/components/dash";
+import { NotDeployed, StatusNotice, Timeline, type Status } from "@/components/ui";
+import { showcaseVaultId } from "@/lib/env";
+import { ReadOnlyContext, useReadOnly } from "@/lib/viewMode";
 import { noteFor, RelayError, useChildActions } from "@/lib/childActions";
 import {
   dateOf,
@@ -39,43 +42,41 @@ function approvedPlaces(history: ReturnType<typeof useHistory>["data"]): Place[]
 }
 
 export default function ChildPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, status: walletStatus } = useAccount();
   const { rails, chainId } = useRails();
   const vaults = useAllVaults();
-  const mine = vaults.items.filter((v) => sameAddr(v.data.child, address));
+  const [demoPick, setDemoPick] = useState(false);
+  const isDemo = !isConnected || demoPick;
+  const mine = vaults.items.filter((v) => (isDemo ? v.id === showcaseVaultId : sameAddr(v.data.child, address)));
   const [selected, setSelected] = useState<bigint | null>(null);
   const current = mine.find((v) => v.id === selected) ?? mine[0];
 
   if (!rails) return <main className="shell"><NotDeployed /></main>;
-  if (!isConnected) {
-    return (
-      <main className="shell">
-        <div className="phone">
-          <NeedWallet role="child" emoji="🎒">Use the account your parent set up for you. You never pay any fees.</NeedWallet>
-        </div>
-      </main>
-    );
-  }
-  if (vaults.isLoading) return <main className="shell"><div className="phone"><p className="empty">Finding your allowance…</p></div></main>;
-  if (!current) {
-    return (
-      <main className="shell">
-        <div className="phone card">
-          <span style={{ fontSize: 44 }} aria-hidden="true">🔎</span>
-          <h2>No allowance for this account yet</h2>
-          <p className="sub">Ask your parent to open one for you. They&apos;ll need this address:</p>
-          <code className="mono" style={{ overflowWrap: "anywhere" }}>{address}</code>
+  if (walletStatus === "connecting" || walletStatus === "reconnecting") return <main className="shell"><p className="empty">Connecting your wallet…</p></main>;
+
+  let body;
+  if (vaults.isLoading) body = <p className="empty">Finding the allowance…</p>;
+  else if (!current && !isDemo)
+    body = (
+      <div className="card">
+        <span style={{ fontSize: 44 }} aria-hidden="true">🔎</span>
+        <h2>No allowance for this account yet</h2>
+        <p className="sub">Ask your parent to open one for you. They&apos;ll need this address:</p>
+        <code className="mono" style={{ overflowWrap: "anywhere" }}>{address}</code>
+        <div className="actions" style={{ marginTop: 12 }}>
           <button type="button" className="btn small secondary" onClick={() => address && navigator.clipboard?.writeText(address)}>
             Copy address
           </button>
+          <button type="button" className="btn small ghost" onClick={() => setDemoPick(true)}>
+            See the showcase child instead
+          </button>
         </div>
-      </main>
+      </div>
     );
-  }
-
-  return (
-    <main className="shell">
-      <div className="phone">
+  else if (!current) body = <p className="empty">The showcase allowance isn&apos;t on this network.</p>;
+  else
+    body = (
+      <>
         {mine.length > 1 && (
           <div className="tabs" role="group" aria-label="Allowances">
             {mine.map((v) => (
@@ -86,8 +87,44 @@ export default function ChildPage() {
           </div>
         )}
         <ChildVault vaultId={current.id} vault={current.data} chainId={chainId} />
-      </div>
-    </main>
+      </>
+    );
+
+  return (
+    <ReadOnlyContext.Provider value={isDemo}>
+      <main className="shell wide">
+        {isDemo && (
+          <DemoBanner
+            role="child"
+            what={<>You&apos;re seeing the showcase child&apos;s phone (allowance #{showcaseVaultId.toString()}). Pick a place and type an amount: the app checks it against the parent&apos;s rules live.</>}
+          />
+        )}
+        <div className="child-layout">
+          <div className="phone">{body}</div>
+          <aside className="child-aside" aria-label="How it works for children">
+            <section className="card">
+              <PanelHead title="🎒 Made for kids" sub="Simple words, no fees, and a kind answer when something isn't allowed." />
+              <div className="powers" style={{ gridTemplateColumns: "1fr" }}>
+                <div className="power yes">✓ Pays approved places on their own, no waiting</div>
+                <div className="power yes">✓ Never pays network fees <Explain term="gas" label="Fees" /></div>
+                <div className="power yes">✓ Sees before paying whether it will go through</div>
+                <div className="power yes">✓ Can ask a parent for a one-time yes <Explain term="exception" label="Exception" /></div>
+              </div>
+            </section>
+            {isDemo && (
+              <section className="card warm">
+                <PanelHead title="🧪 Try it here" />
+                <ol style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <li>Tap a place, then <strong>0.1</strong>: it says ✓ inside the rules.</li>
+                  <li>Type <strong>5</strong>: it explains, kindly, which rule says no.</li>
+                  <li>Connect the child wallet to really pay. The parent never has to approve it.</li>
+                </ol>
+              </section>
+            )}
+          </aside>
+        </div>
+      </main>
+    </ReadOnlyContext.Provider>
   );
 }
 
@@ -118,7 +155,8 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
   const spentNow = spent.data ?? 0n;
   const left = weekly > spentNow ? weekly - spentNow : 0n;
   const expired = nowSec() >= vault.rules.expiresAt;
-  const busy = status.state === "signing" || status.state === "unknown";
+  const readOnly = useReadOnly();
+  const busy = readOnly || status.state === "signing" || status.state === "unknown";
 
   // Live check against the contract before signing: the same rules the contract will apply.
   const preview = useReadContract({
@@ -260,11 +298,11 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
 
         {askMode ? (
           <button type="button" className="btn big block" disabled={!amount || !payeeOk || busy} onClick={doAsk}>
-            Send request to parent
+            {readOnly ? "Connect the child wallet to ask" : "Send request to parent"}
           </button>
         ) : (
           <button type="button" className="btn big block" disabled={!amount || !payeeOk || busy} onClick={doPay}>
-            Pay {amount ? `${fmt(amount)} tUSD8` : ""}
+            {readOnly ? "Connect the child wallet to pay" : `Pay ${amount ? `${fmt(amount)} tUSD8` : ""}`}
           </button>
         )}
         <StatusNotice status={status} onAskException={() => (setAskMode(true), setStatus({ state: "idle" }))} />

@@ -9,11 +9,10 @@ import { GitHubIcon } from "./Icons";
 import { useNetwork } from "@/lib/network";
 
 const links = [
-  { href: "/", label: "Home", emoji: "🏠" },
   { href: "/parent", label: "Parent", emoji: "🧑‍🍼" },
   { href: "/child", label: "Child", emoji: "🎒" },
   { href: "/school", label: "School", emoji: "🏫" },
-  { href: "/guardian", label: "Guardian", emoji: "🛡️" },
+  { href: "/guardian", label: "Guardian", emoji: "🚦" },
   { href: "/judge", label: "For judges", emoji: "🧑‍⚖️" },
 ];
 
@@ -35,7 +34,7 @@ export function Header() {
           </Link>
           <nav className="nav" aria-label="Main">
             {links.map((l) => {
-              const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+              const active = pathname.startsWith(l.href);
               return (
                 <Link key={l.href} href={l.href} aria-current={active ? "page" : undefined}>
                   <span aria-hidden="true">{l.emoji}</span>
@@ -45,9 +44,8 @@ export function Header() {
             })}
           </nav>
           <div className="topbar-end">
-            <a className="gh-link" href={repoUrl} target="_blank" rel="noreferrer" title="Source code on GitHub">
+            <a className="gh-link" href={repoUrl} target="_blank" rel="noreferrer" title="Source code on GitHub" aria-label="Source code on GitHub">
               <GitHubIcon />
-              <span>Code</span>
             </a>
             {networks.length > 1 && (
               <div className="net-switch" role="radiogroup" aria-label="Network">
