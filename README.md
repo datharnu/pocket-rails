@@ -17,6 +17,7 @@ is not audited.
 | **Contract** | v2 [`0xB179…3801` on the Aevum explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) (source verified); v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) holds the first live runs |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
+| **Guardian evaluation** | [docs/AI_EVAL.md](docs/AI_EVAL.md): 50 frozen test notes; rules + AI vetoed 30/30 bad charges (16/16 prompt injections) with 0/16 genuine charges wrongly vetoed |
 | **Plain-English guide** | [docs/GUIDE.md](docs/GUIDE.md): what it is with no crypto jargon, how to test it step by step, and a demo script |
 
 ## What makes Pocket Rails different
@@ -37,6 +38,8 @@ is not audited.
    only lets call `vetoCharge`, sent as ERC-4337 user operations through QDay's bundler
    ([details](#guardian-smart-account-and-veto-only-session-key)).
    Code: [`agents/`](agents/), [`agents/src/review.ts`](agents/src/review.ts), [`VetoOnlySessionValidator.sol`](contracts/src/VetoOnlySessionValidator.sol).
+   Measured on 50 frozen test notes ([docs/AI_EVAL.md](docs/AI_EVAL.md)): rules + AI vetoed 30 of 30 bad charges,
+   including 16 of 16 prompt injections, and wrongly vetoed 0 of 16 genuine ones; the rules alone caught 2 of 30.
    Tests: [`agents/src/policy.test.ts`](agents/src/policy.test.ts), [`test_guardianCanNeverApprove`](contracts/test/PocketRailsBilling.t.sol#L160),
    [`test_parentOverridesWrongVeto`](contracts/test/PocketRailsBilling.t.sol#L168).
 3. **Refusals are recorded, not reverted.** A refused payment or charge still succeeds as a transaction, moves
@@ -96,6 +99,7 @@ the [Safety model](#safety-model).
 | Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
 | History cache for the on-chain timeline (`/api/rails/events`) | Done |
 | Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
+| Guardian evaluation (50 frozen notes, rules vs AI vs both) | Done: [docs/AI_EVAL.md](docs/AI_EVAL.md) |
 | Guardian as a Kernel v3.1 smart account with a veto-only session key (ERC-4337, QDay bundler) | Done: 8 unit tests, 10 fork tests on Aevum's EntryPoint and Kernel, live veto through the bundler |
 | Hosted demo | To do |
 

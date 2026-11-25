@@ -29,7 +29,8 @@ and refusals are recorded on-chain with a reason code instead of reverting.
 **What happens if the guardian agent is offline or wrong?**
 If it's offline, charges inside the caps still settle after the window, like a direct debit, so the parent sets
 tight caps and can require approval of the first charge; if it vetoes wrongly, the parent can pay the charge anyway
-from the parent screen ("Stopped charges", which calls `approveCharge`), and the guardian can never approve.
+from the parent screen ("Stopped charges", which calls `approveCharge`), and the guardian can never approve. On 50 frozen test notes, rules + AI vetoed every bad charge (including 16 prompt
+injections) and no genuine one ([AI_EVAL.md](AI_EVAL.md)).
 
 **Why would a school use this?**
 Our hypothesis, not yet tested with schools: pre-approved, capped collection for meals, transport and trips
