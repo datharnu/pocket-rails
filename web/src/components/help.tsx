@@ -16,6 +16,7 @@ export const GLOSSARY = {
   guardian: "A helper, which can be an AI agent, that reviews school charges. It can only say no. Only the parent can say yes.",
   refusal: "When a payment breaks a rule, nothing is paid, but the refusal is still recorded on the blockchain with a reason, so anyone can check it.",
   onChain: "Recorded on the Aevum blockchain, where anyone can check it with the transaction link. Nobody can quietly change it.",
+  schoolReserve: "Money the parent sets aside for school costs, like the bus pass. The child's own payments can't use it, but school charges can.",
   billing: "Permission for a school to request charges from an allowance, up to limits the parent sets, and only until a date the parent picks.",
 } as const;
 

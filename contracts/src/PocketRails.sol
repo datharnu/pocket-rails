@@ -38,6 +38,7 @@ interface IERC3009 {
 ///      - A guardian (for example an AI agent's key) can only veto school charges. It can never approve,
 ///        raise a limit or move money. "AI can say no, never yes."
 ///      - Memos are stored as hashes only. Keep the text off-chain.
+///      - A parent can earmark part of the balance for school charges: child payments can't touch it.
 ///      - Revoking bumps an epoch, so every pending exception, unsubmitted intent and billing permission
 ///        tied to the old epoch dies in O(1).
 contract PocketRails is EIP712, ReentrancyGuard {
@@ -59,7 +60,8 @@ contract PocketRails is EIP712, ReentrancyGuard {
         OverChargeLimit, //     9 school charge is above the per-charge cap
         OverPeriodLimit, //    10 school charge would pass the per-period cap
         BillingExpired, //     11 billing permission has expired
-        BillingRevoked //      12 billing permission was revoked (alone, or by revoking the whole vault)
+        BillingRevoked, //     12 billing permission was revoked (alone, or by revoking the whole vault)
+        EarmarkedForSchool //  13 the payment would use money the parent set aside for school charges
     }
 
     enum ExceptionStatus {
@@ -96,6 +98,7 @@ contract PocketRails is EIP712, ReentrancyGuard {
         uint64 week; // week index that `weekSpent` belongs to
         uint256 weekSpent;
         uint256 balance;
+        uint256 schoolReserve; // part of `balance` set aside for school charges; child payments can't use it
         Rules rules;
     }
 
@@ -226,6 +229,7 @@ contract PocketRails is EIP712, ReentrancyGuard {
         uint256 indexed vaultId, uint64 indexed version, address by, address child, bool active, uint64 epoch
     );
     event GuardianChanged(uint256 indexed vaultId, uint64 indexed version, address by, address guardian);
+    event SchoolReserveChanged(uint256 indexed vaultId, uint64 indexed version, address by, uint256 amount);
     event VaultRevoked(uint256 indexed vaultId, uint64 indexed version, address by, uint64 childEpoch, uint64 billingEpoch);
 
     event Paid(
@@ -375,6 +379,7 @@ contract PocketRails is EIP712, ReentrancyGuard {
         Vault storage v = _vaults[vaultId];
         if (amount > v.balance) revert NotEnoughBalance();
         v.balance -= amount;
+        if (v.schoolReserve > v.balance) v.schoolReserve = v.balance; // the parent can always take money out
         emit Withdrawn(vaultId, to, amount);
         token.safeTransfer(to, amount);
     }
@@ -419,6 +424,17 @@ contract PocketRails is EIP712, ReentrancyGuard {
         uint64 epoch = ++v.childEpoch;
         uint64 version = ++v.version;
         emit ChildChanged(vaultId, version, msg.sender, v.child, false, epoch);
+    }
+
+    /// @notice Set aside part of the balance for school charges ("earmark"). Child payments, including
+    ///         one-time exceptions, can't use it; school charges can, and settling one uses up the reserve
+    ///         first. Can't exceed the current balance. Set 0 to remove it.
+    function setSchoolReserve(uint256 vaultId, uint256 amount) external onlyParent(vaultId) {
+        Vault storage v = _vaults[vaultId];
+        if (amount > v.balance) revert NotEnoughBalance();
+        v.schoolReserve = amount;
+        uint64 version = ++v.version;
+        emit SchoolReserveChanged(vaultId, version, msg.sender, amount);
     }
 
     /// @notice Set (or clear, with address(0)) the guardian, a key that may only veto school charges.
@@ -785,6 +801,7 @@ contract PocketRails is EIP712, ReentrancyGuard {
         }
 
         if (amount > v.balance) return Reason.InsufficientBalance;
+        if (amount > v.balance - v.schoolReserve) return Reason.EarmarkedForSchool;
         return Reason.None;
     }
 
@@ -825,6 +842,7 @@ contract PocketRails is EIP712, ReentrancyGuard {
         c.status = ChargeStatus.Settled;
         b.hasSettled = true;
         v.balance -= c.amount;
+        v.schoolReserve = v.schoolReserve > c.amount ? v.schoolReserve - c.amount : 0;
         emit ChargeSettled(c.billingId, chargeId, b.payTo, c.amount);
         token.safeTransfer(b.payTo, c.amount);
     }

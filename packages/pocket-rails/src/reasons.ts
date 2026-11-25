@@ -17,6 +17,7 @@ export enum Reason {
   OverPeriodLimit = 10,
   BillingExpired = 11,
   BillingRevoked = 12,
+  EarmarkedForSchool = 13,
 }
 
 export interface ReasonText {
@@ -93,6 +94,12 @@ export const reasonText: Record<Reason, ReasonText> = {
     name: "BillingExpired",
     message: "This billing permission has ended.",
     nextStep: "The parent can grant a new one.",
+    canAskException: false,
+  },
+  [Reason.EarmarkedForSchool]: {
+    name: "EarmarkedForSchool",
+    message: "That money is set aside for school costs.",
+    nextStep: "Pay a smaller amount, or ask your parent to lower the amount set aside.",
     canAskException: false,
   },
   [Reason.BillingRevoked]: {

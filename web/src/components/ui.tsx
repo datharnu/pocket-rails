@@ -116,6 +116,7 @@ const EVENT_TEXT: Record<string, (a: HistoryEvent["args"], label: (x: string) =>
   ChildChanged: (a) => `Rules v${a.version}: child access ${a.active ? "on" : "paused"}`,
   GuardianChanged: (a, l) => `Rules v${a.version}: guardian ${String(a.guardian) === "0x0000000000000000000000000000000000000000" ? "removed" : `set to ${l(String(a.guardian))}`}`,
   VaultRevoked: (a) => `Rules v${a.version}: everything revoked`,
+  SchoolReserveChanged: (a, _l, m) => `Rules v${a.version}: ${m(a.amount)} set aside for school costs`,
   Paid: (a, l, m) => `Paid ${m(a.amount)} to ${l(String(a.payee))}${String(a.exceptionId) !== "0" ? ` (exception #${a.exceptionId})` : ""}`,
   Refused: (a, l, m) => `Refused ${m(a.amount)} to ${l(String(a.payee))}: ${explainReason(Number(a.reason)).message}`,
   ExceptionRequested: (a, l, m) => `Exception #${a.exceptionId} requested: ${m(a.amount)} to ${l(String(a.payee))}`,

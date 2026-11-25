@@ -455,6 +455,8 @@ function Money({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
   const { status, run, busy } = useAction();
   const [amountText, setAmountText] = useState("1");
   const amount = parseAmount(amountText);
+  const [reserveText, setReserveText] = useState(fmt(vault.schoolReserve, 6));
+  const reserve = reserveText.trim() === "0" ? 0n : parseAmount(reserveText);
 
   async function topUp() {
     if (!amount || !token.address || !rails || !address) return;
@@ -494,6 +496,27 @@ function Money({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
         </button>
       </div>
       {amount && wallet.data !== undefined && amount > wallet.data && <span className="field-error">Your wallet doesn&apos;t hold that much tUSD8.</span>}
+
+      <div className="lbl">
+        <span>
+          <label htmlFor="school-reserve">🚌 Set aside for school (tUSD8)</label> <Explain term="schoolReserve" label="Set aside for school" />
+        </span>
+        <span className="hint">
+          Now: {fmt(vault.schoolReserve)} set aside, so your child can spend {fmt(vault.balance - vault.schoolReserve)}. School charges can still use it.
+        </span>
+        <input id="school-reserve" className="field" inputMode="decimal" value={reserveText} onChange={(e) => setReserveText(e.target.value)} />
+      </div>
+      <div className="actions">
+        <button
+          type="button"
+          className="btn secondary"
+          disabled={reserve === undefined || busy || reserve > vault.balance || reserve === vault.schoolReserve}
+          onClick={() => reserve !== undefined && run((s) => write("setSchoolReserve", [vaultId, reserve], s))}
+        >
+          Save amount set aside
+        </button>
+      </div>
+      {reserve !== undefined && reserve > vault.balance && <span className="field-error">You can&apos;t set aside more than the allowance holds ({fmt(vault.balance)}).</span>}
       <StatusNotice status={status} />
     </section>
   );

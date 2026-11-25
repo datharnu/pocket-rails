@@ -197,6 +197,12 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
           </span>
           <span>max {fmt(vault.rules.perPaymentLimit)} per payment</span>
         </div>
+        {vault.schoolReserve > 0n && (
+          <div className="row-between">
+            <span>🚌 {fmt(vault.schoolReserve)} set aside for school</span>
+            <span>you can spend {fmt(vault.balance - vault.schoolReserve)}</span>
+          </div>
+        )}
       </section>
 
       <section className="card form" aria-label={askMode ? "Ask for an exception" : "Pay"}>

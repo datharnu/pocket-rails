@@ -123,6 +123,12 @@ contract Handler is Test {
         rails.withdraw(vaultId, amount, parent);
     }
 
+    function setReserve(uint256 amount) external {
+        uint256 bal = rails.getVault(vaultId).balance;
+        vm.prank(parent);
+        rails.setSchoolReserve(vaultId, bound(amount, 0, bal));
+    }
+
     function revokeAndRestore() external {
         vm.startPrank(parent);
         rails.revokeChild(vaultId);
@@ -155,6 +161,12 @@ contract PocketRailsInvariantTest is PocketRailsBase {
     /// @notice Standing-rule spending this week never passes the weekly limit.
     function invariant_weeklyLimit() public view {
         assertLe(rails.spentThisWeek(vaultId), rails.getVault(vaultId).rules.weeklyLimit);
+    }
+
+    /// @notice The school reserve is always covered by the balance.
+    function invariant_reserveNeverExceedsBalance() public view {
+        PocketRails.Vault memory v = rails.getVault(vaultId);
+        assertLe(v.schoolReserve, v.balance);
     }
 
     /// @notice Nobody outside the approved payee and the school's treasury ever receives money.

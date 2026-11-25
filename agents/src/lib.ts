@@ -76,6 +76,7 @@ export type Vault = {
   week: bigint;
   weekSpent: bigint;
   balance: bigint;
+  schoolReserve: bigint;
   rules: { perPaymentLimit: bigint; weeklyLimit: bigint; expiresAt: bigint };
 };
 export type Billing = {

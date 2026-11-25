@@ -638,6 +638,11 @@ export const pocketRailsAbi = [
             "internalType": "uint256"
           },
           {
+            "name": "schoolReserve",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "rules",
             "type": "tuple",
             "internalType": "struct PocketRails.Rules",
@@ -1233,6 +1238,24 @@ export const pocketRailsAbi = [
             "internalType": "uint64"
           }
         ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setSchoolReserve",
+    "inputs": [
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -1986,6 +2009,37 @@ export const pocketRailsAbi = [
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SchoolReserveChanged",
+    "inputs": [
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "version",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
+      },
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
