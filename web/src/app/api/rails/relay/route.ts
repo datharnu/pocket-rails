@@ -56,7 +56,8 @@ export const runtime = "nodejs";
 const MAX_DEADLINE_AHEAD = 15n * 60n;
 const PER_IP_PER_MINUTE = 20;
 const PER_VAULT_PER_MINUTE = 12;
-const REFUSALS_PER_VAULT_PER_HOUR = 10;
+// Recorded refusals per vault per hour. 0 turns the limit off (e.g. for demo rehearsals on one vault).
+const REFUSALS_PER_VAULT_PER_HOUR = Number(process.env.RELAYER_REFUSALS_PER_VAULT_PER_HOUR ?? 10);
 const isDev = process.env.NODE_ENV !== "production";
 
 const isUint = (v: unknown): v is string => typeof v === "string" && /^\d{1,78}$/.test(v);
@@ -199,7 +200,7 @@ export async function POST(req: Request) {
 
     // 6. Refusal budget.
     const refusalBucket = `refusals:${vaultKey}`;
-    if (expectedReason !== Reason.None && count(refusalBucket, 3_600_000) >= REFUSALS_PER_VAULT_PER_HOUR) {
+    if (expectedReason !== Reason.None && REFUSALS_PER_VAULT_PER_HOUR > 0 && count(refusalBucket, 3_600_000) >= REFUSALS_PER_VAULT_PER_HOUR) {
       releaseInFlight(flightKey);
       const text = explainReason(expectedReason);
       return fail(`${text.message} ${text.nextStep} (Too many refused attempts this hour, so this one wasn't recorded on-chain.)`, 429);

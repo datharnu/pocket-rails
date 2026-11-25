@@ -6,7 +6,7 @@ import { isAddress, type Address } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { Explain, Guide } from "@/components/help";
 import { NeedWallet, NotDeployed, StatusNotice, Timeline, type Status } from "@/components/ui";
-import { noteFor, useChildActions } from "@/lib/childActions";
+import { noteFor, RelayError, useChildActions } from "@/lib/childActions";
 import {
   dateOf,
   ExceptionStatus,
@@ -96,7 +96,8 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
   const spent = useSpentThisWeek(vaultId);
   const history = useHistory(vaultId);
   const exceptions = useAllExceptions();
-  const { pay, requestException } = useChildActions();
+  const { pay, requestException, submitYourself } = useChildActions();
+  const [fallback, setFallback] = useState<RelayError | null>(null);
 
   const places = useMemo(() => approvedPlaces(history.data), [history.data]);
   const labels = useMemo(() => payeeLabels(history.data), [history.data]);
@@ -134,14 +135,18 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
 
   async function run(fn: () => Promise<import("@pocket-rails/sdk").Outcome>) {
     setStatus({ state: "signing", text: "Check your wallet…" });
+    setFallback(null);
     try {
       const outcome = await fn();
       setStatus({ state: "done", outcome });
       if (outcome.kind === "allow") setAmountText("");
     } catch (e) {
+      if (e instanceof RelayError && e.canSelfSubmit) setFallback(e);
       setStatus({ state: "error", text: e instanceof Error ? e.message : "Something went wrong. Nothing was sent." });
     }
   }
+
+  const sendYourself = () => fallback && run(() => submitYourself(fallback.signed, (s) => setStatus(s)));
 
   const doPay = () =>
     amount && payeeOk &&
@@ -257,6 +262,20 @@ function ChildVault({ vaultId, vault, chainId }: { vaultId: bigint; vault: Vault
           </button>
         )}
         <StatusNotice status={status} onAskException={() => (setAskMode(true), setStatus({ state: "idle" }))} />
+        {fallback && status.state === "error" && (
+          <div className="notice warn">
+            <strong>Plan B: send it yourself</strong>
+            <span>
+              The app&apos;s server can&apos;t send this right now. You can send the payment you already signed from your own wallet. The rules are
+              exactly the same; you just pay a tiny network fee <Explain term="gas" label="Fee" /> in tQDAY.
+            </span>
+            <div className="actions">
+              <button type="button" className="btn small" disabled={busy} onClick={sendYourself}>
+                Send it myself
+              </button>
+            </div>
+          </div>
+        )}
         {!askMode && (
           <button type="button" className="btn small ghost" onClick={() => (setAskMode(true), setStatus({ state: "idle" }))}>
             Need something else? Ask your parent

@@ -2,7 +2,14 @@
 
 **Kids pay out, the school bills in, parents set the rules once.**
 Every payment, in either direction, is checked by the same smart contract on QDay Aevum testnet, in tUSD8.
-AI helpers can say no, never yes: every yes traces back to a parent's signature.
+AI helpers can say no, never yes: every yes traces back to a permission the parent signed.
+
+| Try it | |
+|---|---|
+| **Live app** | _hosted URL coming soon_ (runs locally today: see [Run it locally](#run-it-locally)) |
+| **Contract** | [`0x7d54…40Df` on the Aevum explorer](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) (source verified) |
+| **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): every step of the child and school flows, with transaction links |
+| **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
 
 > Built for Aevum Builder Challenge #1. **Testnet only, test tokens only, not audited.** No real money,
 > no real children's data and no real merchants. It doesn't replace parental judgment.
@@ -13,13 +20,14 @@ AI helpers can say no, never yes: every yes traces back to a parent's signature.
 
 | Part | State |
 |---|---|
-| `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 56 unit and fuzz tests, 3 invariants (128,000 random calls), 2 fork tests on the real tUSD8 |
+| `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 57 unit and fuzz tests, 3 invariants (128,000 random calls), 2 fork tests on the real tUSD8 |
 | TypeScript SDK (`packages/pocket-rails`): ABI, EIP-712 intents, reason codes, outcome decoding | Done |
 | Relayer for child intents (`/api/rails/relay`) and outcome lookup (`/api/rails/tx`) | Done, tested end to end on a local chain (`pnpm example demo-flow`) |
-| Deployment to Aevum testnet | Done: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
+| Deployment to Aevum testnet | Done and **source verified** on the explorer: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
 | Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
 | History cache for the on-chain timeline (`/api/rails/events`) | Done |
-| Guardian agent and school billing agent (`agents/`) | Done, tested together on a local chain |
+| Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
+| Hosted demo | To do |
 
 ---
 
@@ -50,6 +58,57 @@ flowchart LR
     G[Guardian agent] -- "vetoCharge() only" --> V
     V -- "settle after window" --> T[School treasury]
     P -- "approve / override / revoke" --> V
+```
+
+**Child pays (push), step by step**
+
+```mermaid
+sequenceDiagram
+    actor Child
+    participant App as App (phone)
+    participant Relayer
+    participant PR as PocketRails (Aevum)
+    participant Shop as Canteen
+    Child->>App: choose place, amount, note
+    App->>PR: previewPayment() (read, free)
+    PR-->>App: "inside your rules" or reason code
+    Child->>App: tap Pay → sign EIP-712 intent (no gas)
+    App->>Relayer: POST /api/rails/relay
+    Relayer->>Relayer: check signature, nonce, deadline, simulate
+    Relayer->>PR: pay(intent, signature)
+    alt inside the rules
+        PR->>Shop: transfer tUSD8
+        PR-->>App: Paid event
+    else a rule is broken
+        PR-->>App: Refused event + reason code (no money moves)
+    end
+    Note over App,Relayer: If the relayer is down, the child can send the same<br/>signed intent from their own wallet ("Send it myself").
+```
+
+**School bills (pull), step by step**
+
+```mermaid
+sequenceDiagram
+    actor Parent
+    participant PR as PocketRails (Aevum)
+    participant School as School billing agent
+    participant Guard as Guardian agent (+ optional AI)
+    Parent->>PR: grantBilling(caps, expiry, veto window)
+    School->>PR: requestCharge(amount, note hash)
+    alt over a cap
+        PR-->>School: ChargeRefused + reason (recorded, nothing pending)
+    else inside the caps
+        PR-->>Guard: ChargeRequested (Pending until settleAfter)
+        Guard->>Guard: rules (duplicate, weekend, price), then AI note review
+        opt looks wrong
+            Guard->>PR: vetoCharge(reason)
+        end
+        opt parent decides
+            Parent->>PR: approveCharge (pays now, also overrides a veto) or vetoCharge
+        end
+        School->>PR: settle() after the window
+        PR->>School: transfer tUSD8 to the treasury the parent approved
+    end
 ```
 
 ### Child pays (push)
@@ -156,6 +215,60 @@ contract refuses and records it). Settings: `agents/.env.example`. Rule tests: `
 | Parent key is stolen | Out of scope for the contract: the parent key is the root of authority. Roadmap: parent as a smart account with recovery. |
 | Privacy | Memos are stored as hashes only. Payees and amounts are public on any public chain; don't put personal details in labels. |
 
+"Every yes traces back to a permission the parent signed": a child's payment is allowed by rules the parent
+set, an exception by the parent's `allowOnce`, and a school charge by the billing permission the parent
+granted. School charges inside that permission settle after the veto window without a fresh signature, the
+same way a direct debit works.
+
+### What revoking does to things already in flight
+
+| Situation | Result | Test |
+|---|---|---|
+| Parent revokes a billing permission while a charge is pending | The charge can't be paid. `settle()` marks it `Failed` (reason `BillingRevoked`) and frees its allowance; new charges are refused. | `test_revokeBilling_pendingChargesFail` |
+| Parent calls `revokeAll` | Child access off, every billing permission and pending charge dead, pending exceptions dead. Funds stay in the vault. | `test_revokeAll_stopsEverything` |
+| Parent revokes, then clicks Approve on an old charge | Still not paid: the charge fails. A revoked permission can't be revived by approving. | `test_approveAfterRevoke_cannotPay` |
+| Child access revoked (or rotated) with signed intents not yet submitted | Refused and recorded (`AccessRevoked`); exceptions from before the revoke can't be used. | `test_refuse_afterRevoke_andOldIntentsStayDeadAfterRestore`, `test_exception_diesOnRevoke` |
+| A permission **expires** while a charge is in its window | The charge can still settle (it was requested while the permission was valid); new charges are refused. | `test_charge_afterExpiry_refused` |
+| Vault doesn't hold enough when the window ends | `Failed` (`InsufficientBalance`), nothing moves, the allowance is freed. | `test_settle_insufficientBalance_fails` |
+
+---
+
+## How Pocket Rails uses Aevum
+
+| Aevum piece | How it's used | Where |
+|---|---|---|
+| **tUSD8** (`0x4565…3483`, 6 decimals) | The only currency. Vault balances are tracked inside PocketRails and backed 1:1 by tUSD8 it holds (checked by an invariant test over 128,000 random calls). | `contracts/src/PocketRails.sol`, `PocketRailsInvariant.t.sol` |
+| **EIP-3009 `receiveWithAuthorization`** on tUSD8 | Gasless top-ups: anyone signs a transfer to PocketRails and anyone submits it. The authorization nonce is `keccak256(contract, vaultId, salt)`, so a relayer can't credit a different vault. Tested against the real tUSD8 on a fork. | `depositWithAuthorization`, `test/fork/PocketRailsFork.t.sol` |
+| **EIP-712 signatures on chain 44005** | Children sign payment intents and exception requests; the domain binds them to chain 44005 and this contract. `SignatureChecker` also accepts ERC-1271 smart-account signatures. | `hashPayment`, `packages/pocket-rails/src/intents.ts` |
+| **Shanghai EVM** (no Cancun opcodes) | Compiled with `evm_version = "shanghai"`; `make build` scans the bytecode for Cancun-only opcodes; no transient-storage OpenZeppelin contracts. | `contracts/foundry.toml`, `tools/check-shanghai.mjs` |
+| **Legacy (type 0) transactions** | The relayer, agents and app send legacy transactions, as Aevum recommends. | `web/src/app/api/rails/relay/route.ts`, `agents/src/lib.ts` |
+| **`eth_getLogs` limited to 1,000 blocks; ~1 block/second** | History is scanned server-side in parallel 1,000-block chunks, cached to disk, then read incrementally. Current state never depends on logs: it's read from contract views. | `web/src/lib/indexer.ts` |
+| **No WebSocket RPC** | The app and agents poll over HTTPS (transaction status every 1.5 s, state every few seconds). | `web/src/app/api/rails/tx/route.ts`, `agents/` |
+| **Multicall3** | Lists (allowances, requests, charges) are read in one call each. Agents fall back to single reads on chains without it. | `web/src/lib/rails.ts`, `agents/src/lib.ts` |
+| **Explorer (Blockscout)** | Source verified; every screen and log links transactions to it. | [contract page](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract) |
+| **Starter kit** (`qday-io/aevum-starter-kit`) | Foundry setup, `MockUSD8`, Shanghai check, chunked log helper, chain config, Next.js scaffolding, relayer protections. Credited in `NOTICE.md`. | `packages/aevum`, `tools/` |
+| **Faucets** | Demo accounts were funded from the Discord faucet (the web faucet requires mainnet holdings); demo amounts are scaled to one claim. | `docs/PLATFORM_FEEDBACK.md` |
+| **ERC-4337 EntryPoint v0.7 and Kernel v3.1** | **Not used yet.** They're deployed on Aevum; making the parent a Kernel smart account with session keys is on the roadmap. | Roadmap |
+| **ERC-8004 identity registry** | **Not used.** The starter kit says QDay's registry isn't open for this challenge, so approved places are stored in PocketRails. | Roadmap |
+
+## Business model and distribution
+
+These are plans and hypotheses, not validated results.
+
+- **Who pays: schools, not families.** A school gets pre-approved, capped collection for meals, transport and
+  trips, with fewer unpaid balances and no cash handling. Hypothesis: a small fee per settled charge (for
+  example 0.5–1%) or a flat monthly fee per school, with the family side free.
+- **Optional family plan.** A hosted guardian (rules plus AI review) and multi-child dashboards as a small
+  subscription; the core allowance stays free.
+- **Distribution: school by school.** One school onboards its canteen and transport as approved places and
+  its billing agent as a permission template; it then invites families, who open an allowance in minutes.
+  Every school that joins brings its families, and families bring siblings at other schools.
+- **First markets (hypothesis):** schools where stablecoin payments already make sense, such as cross-border
+  families paying school costs and private or international schools.
+- **Path to production:** licensed on- and off-ramp partners, an audit, the parent as a smart account with
+  recovery, and Aevum mainnet once available. Real deployments with minors would need legal review in each
+  market.
+
 ---
 
 ## Contracts
@@ -165,9 +278,17 @@ contract refuses and records it). Settings: `agents/.env.example`. Rule tests: `
 | PocketRails | [`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df), deployed in block 4072059 by tx [`0xc77c22a4…b728`](https://explorer-test.qday.info/tx/0xc77c22a458fe2fc54d47085ccc195e5e496764174d01b502f03eeb9ffdabb728) |
 | tUSD8 | [`0x456569838f1d43009A91ebA4263147Afd7233483`](https://explorer-test.qday.info/address/0x456569838f1d43009A91ebA4263147Afd7233483) |
 
-The explorer's contract verifier isn't working yet, so the deployed source is the exact commit linked here
-[`335f5e6`](https://github.com/datharnu/pocket-rails/tree/335f5e64b223e0ffcc10abab00407ea30c02d585). The deployed bytecode is 19,417 bytes, matching
-`contracts/out/PocketRails.sol/PocketRails.json` at that commit. A live run of the full flow, with every transaction: [docs/DEMO_RUN.md](docs/DEMO_RUN.md). Demo accounts and their roles:
+**Source verified** on the Aevum explorer (Blockscout) on 2026-11-25: compiler 0.8.24, optimizer 200 runs,
+EVM `shanghai`, 23 source files ([view the verified code](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract)).
+It was deployed from commit [`335f5e6`](https://github.com/datharnu/pocket-rails/tree/335f5e64b223e0ffcc10abab00407ea30c02d585); the contract
+hasn't changed since. Reproduce the verification with:
+
+```bash
+cd contracts && forge verify-contract 0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df src/PocketRails.sol:PocketRails \
+  --chain-id 44005 --verifier blockscout --verifier-url https://explorer-test.qday.info/api/ \
+  --constructor-args $(cast abi-encode "constructor(address)" 0x456569838f1d43009A91ebA4263147Afd7233483)
+```
+ A live run of the full flow, with every transaction: [docs/DEMO_RUN.md](docs/DEMO_RUN.md). Demo accounts and their roles:
 [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md).
 
 ### Main functions
@@ -243,6 +364,7 @@ testnet, it prints explorer links for every step.
 | `NEXT_PUBLIC_RAILS_AEVUM` / `_FORK` / `_LOCAL` | yes, for each network you use | PocketRails address |
 | `NEXT_PUBLIC_RAILS_DEPLOY_BLOCK_AEVUM` / `_FORK` | recommended | Block PocketRails was deployed at; history is read from here |
 | `RELAYER_PRIVATE_KEY` | for gasless child payments | A fresh TEST wallet with a little tQDAY. Server-only. anvil keys are refused on Aevum. |
+| `RELAYER_REFUSALS_PER_VAULT_PER_HOUR` | no | Recorded refusals per vault per hour (default 10, `0` = no limit for demo rehearsals) |
 | `RELAYER_DAILY_TX_LIMIT` | no | Max relayed transactions per day per server process (default 500) |
 | `TRUSTED_IP_HEADER` | on a hosted deploy | Header your host sets with the client IP (Vercel: `x-vercel-forwarded-for`) |
 | `NEXT_PUBLIC_WC_PROJECT_ID` | no | Enables WalletConnect for mobile wallets |
@@ -301,8 +423,11 @@ Aevum has no WebSocket RPC, so clients poll it.
   period's usage but isn't blocked by the cap (it's the parent's explicit decision).
 - A charge settles to the treasury fixed in the permission. A permission that expires during a charge's veto
   window can still settle that charge.
-- Refusals cost gas. The relayer rate-limits submissions; a child paying their own gas could add refusal
-  noise to their own vault's history but can't move money.
+- Refusals cost gas. The relayer records at most `RELAYER_REFUSALS_PER_VAULT_PER_HOUR` refusals per vault
+  per hour (default 10; set `0` to turn the limit off when rehearsing a demo on one vault). A child paying
+  their own gas could add refusal noise to their own vault's history but can't move money.
+- If the relayer is down, the child screen offers **"Send it myself"**: the child submits the intent they
+  already signed from their own wallet (needs a little tQDAY for the fee). The contract applies the same rules.
 - QDay's ERC-8004 registry isn't open for this challenge (per the starter kit), so approved payees are stored
   in this contract.
 

@@ -3,9 +3,11 @@
 import { useCallback } from "react";
 import type { Address, Hash, Hex } from "viem";
 import { useAccount, useConfig } from "wagmi";
-import { signTypedData } from "wagmi/actions";
+import { signTypedData, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import {
+  decodeOutcome,
   deadlineIn,
+  pocketRailsAbi,
   exceptionRequestTypes,
   memoHash,
   paymentTypes,
@@ -51,6 +53,21 @@ export function noteFor(hash: string): string | undefined {
 
 export type Step = { state: "signing"; text: string } | { state: "unknown"; text: string; hash?: Hash };
 
+/**
+ * The relayer couldn't send a signed intent (down, out of gas, unreachable). The intent and signature are
+ * kept so the child can submit it from their own wallet instead: the contract checks exactly the same
+ * signature and rules, it only needs a little tQDAY for the network fee.
+ */
+export class RelayError extends Error {
+  constructor(
+    message: string,
+    readonly signed: { kind: "pay" | "requestException"; intent: Payment | ExceptionRequest; signature: Hex },
+    readonly canSelfSubmit: boolean,
+  ) {
+    super(message);
+  }
+}
+
 async function waitForOutcome(chainId: number, hash: Hash): Promise<Outcome> {
   for (let i = 0; i < 80; i++) {
     try {
@@ -66,6 +83,7 @@ async function waitForOutcome(chainId: number, hash: Hash): Promise<Outcome> {
 }
 
 async function relay(chainId: number, kind: "pay" | "requestException", intent: Payment | ExceptionRequest, signature: Hex): Promise<Hash> {
+  const signed = { kind, intent, signature };
   let res: Response;
   try {
     res = await fetch("/api/rails/relay", {
@@ -74,10 +92,14 @@ async function relay(chainId: number, kind: "pay" | "requestException", intent: 
       body: JSON.stringify({ chainId, kind, intent: toWire(intent), signature }),
     });
   } catch {
-    throw new Error("Couldn't reach the app's server. Nothing was sent. Check your connection and try again.");
+    throw new RelayError("Couldn't reach the app's server. Nothing was sent.", signed, true);
   }
   const body = (await res.json().catch(() => ({}))) as { hash?: Hash; error?: string };
-  if (!res.ok || !body.hash) throw new Error(body.error ?? "The relayer couldn't send this. Nothing was sent.");
+  if (!res.ok || !body.hash) {
+    // Server-side trouble (relayer off, out of gas, overloaded) can be worked around; a rejected intent can't.
+    const serverTrouble = res.status >= 500 || res.status === 429;
+    throw new RelayError(body.error ?? "The relayer couldn't send this. Nothing was sent.", signed, serverTrouble);
+  }
   return body.hash;
 }
 
@@ -164,5 +186,34 @@ export function useChildActions() {
     [config, address, walletChain, rails, chainId],
   );
 
-  return { pay, requestException };
+  /** Fallback: the child submits their own signed intent (pays the small network fee in tQDAY). */
+  const submitYourself = useCallback(
+    async (signed: RelayError["signed"], onStep: (s: Step) => void): Promise<Outcome> => {
+      const railsAddr = ready();
+      onStep({ state: "signing", text: "Confirm in your wallet. This one needs a tiny network fee in tQDAY…" });
+      let hash: Hash;
+      try {
+        hash =
+          signed.kind === "pay"
+            ? await writeContract(config, { address: railsAddr, abi: pocketRailsAbi, functionName: "pay", args: [signed.intent as Payment, signed.signature], chainId, type: "legacy" })
+            : await writeContract(config, {
+                address: railsAddr,
+                abi: pocketRailsAbi,
+                functionName: "requestException",
+                args: [signed.intent as ExceptionRequest, signed.signature],
+                chainId,
+                type: "legacy",
+              });
+      } catch (e) {
+        throw new Error(explainRails(e));
+      }
+      onStep({ state: "unknown", text: "Waiting for Aevum to confirm…", hash });
+      const receipt = await waitForTransactionReceipt(config, { hash, chainId, timeout: 120_000 });
+      return decodeOutcome(receipt, railsAddr);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config, address, walletChain, rails, chainId],
+  );
+
+  return { pay, requestException, submitYourself };
 }

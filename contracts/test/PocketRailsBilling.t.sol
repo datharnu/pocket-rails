@@ -231,6 +231,17 @@ contract PocketRailsBillingTest is PocketRailsBase {
         assertEq(uint8(r), uint8(PocketRails.Reason.BillingRevoked));
     }
 
+    function test_approveAfterRevoke_cannotPay() public {
+        uint256 billingId = _grantMeals();
+        (uint256 chargeId,) = _charge(billingId, 3e6);
+        vm.startPrank(parent);
+        rails.revokeBilling(billingId);
+        rails.approveCharge(chargeId); // even the parent's own "yes" can't revive a revoked permission
+        vm.stopPrank();
+        assertEq(rails.getCharge(chargeId).status._s(), PocketRails.ChargeStatus.Failed._s());
+        assertEq(token.balanceOf(schoolTreasury), 0);
+    }
+
     function test_revokeAll_stopsEverything() public {
         uint256 billingId = _grantMeals();
         (uint256 chargeId,) = _charge(billingId, 3e6);

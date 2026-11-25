@@ -5,7 +5,7 @@ Each entry says what we saw, when, and what would help. Checked items have been 
 
 | # | Date (UTC) | Area | What we saw | Suggestion | Reported |
 |---|---|---|---|---|---|
-| 1 | 2026-11-25 | Explorer | Contract verification doesn't work yet (as the starter kit notes), so judges can't read verified source on the explorer. | Re-enable the Blockscout verifier, or publish an ETA. | [ ] |
+| 1 | 2026-11-25 | Explorer | The starter kit says contract verification doesn't work. **Update: it worked for us on 2026-11-25 (09:55 UTC)** with `forge verify-contract --verifier blockscout --verifier-url https://explorer-test.qday.info/api/`. | Update the starter kit README so builders know verification is back. | [ ] |
 | 2 | 2026-11-25 | Docs | The starter kit FAQ says there's "no officially supported bundler or paymaster", while qday.io/build lists smart accounts, bundlers, a stablecoin paymaster, agent wallets and session keys as "live on testnet". Builders can't tell which is true. | One source of truth for account-abstraction support, with endpoints and addresses. | [ ] |
 | 3 | 2026-11-25 | Docs | qday.io/build links an "Official contract addresses" page at wiki.qday.info/Knowledge/reference/contracts that returns 404. | Fix the link, or point to qday.io/official-links. | [ ] |
 | 4 | 2026-11-25 | On-chain | EntryPoint v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da032`) and Kernel v3.1 contracts are deployed on 44005, but no official page lists them. | List them on the official links page if they're supported. | [ ] |

@@ -26,7 +26,7 @@ const roles = [
 
 const safety = [
   { emoji: "🔒", title: "The rules live with the money", text: "A smart contract holds the allowance and checks every payment. No screen or server can get around it." },
-  { emoji: "🙅", title: "AI can say no, never yes", text: "The guardian, even an AI one, can only stop charges. Every yes comes from a parent." },
+  { emoji: "🙅", title: "AI can say no, never yes", text: "The guardian, even an AI one, can only stop charges. Every yes comes from rules or a permission the parent gave." },
   { emoji: "🧾", title: "Every decision has a receipt", text: "Payments, refusals, requests and rule changes are all recorded publicly, so anyone can check them." },
   { emoji: "⛔", title: "One tap stops everything", text: "A parent can pause the child or cancel all school billing instantly. The money stays safe." },
 ];
@@ -104,7 +104,7 @@ export default function Home() {
             </div>
           ))}
         </div>
-        <p className="slogan">“AI can say no, never yes. Every yes traces back to a parent.”</p>
+        <p className="slogan">“AI can say no, never yes. Every yes traces back to a permission the parent gave.”</p>
       </section>
 
       {rails && (
