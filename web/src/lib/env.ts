@@ -8,14 +8,10 @@ export interface Network {
   /** Short name for the network switcher. */
   label: string;
   chain: Chain;
-  /** Your Checkout on this network, if you deployed one. */
-  checkout?: Address;
   /** PocketRails on this network, if deployed. */
   rails?: Address;
   /** Block PocketRails was deployed at: history is read from here (1,000 blocks per call). */
   railsDeployBlock?: bigint;
-  /** Only scan events from this block onward on the Activity page. */
-  deployBlock?: bigint;
   /** Explorer links only make sense on the real testnet. */
   hasExplorer: boolean;
 }
@@ -29,30 +25,24 @@ const all: Record<NetworkKey, Network> = {
     key: "aevum",
     label: "Aevum testnet",
     chain: aevumTestnet,
-    checkout: address(process.env.NEXT_PUBLIC_CHECKOUT_AEVUM),
     rails: address(process.env.NEXT_PUBLIC_RAILS_AEVUM),
     railsDeployBlock: block(process.env.NEXT_PUBLIC_RAILS_DEPLOY_BLOCK_AEVUM),
-    deployBlock: block(process.env.NEXT_PUBLIC_DEPLOY_BLOCK_AEVUM),
     hasExplorer: true,
   },
   fork: {
     key: "fork",
     label: "Local fork",
     chain: aevumFork,
-    checkout: address(process.env.NEXT_PUBLIC_CHECKOUT_FORK),
     rails: address(process.env.NEXT_PUBLIC_RAILS_FORK),
     railsDeployBlock: block(process.env.NEXT_PUBLIC_RAILS_DEPLOY_BLOCK_FORK),
-    deployBlock: block(process.env.NEXT_PUBLIC_DEPLOY_BLOCK_FORK),
     hasExplorer: false,
   },
   local: {
     key: "local",
     label: "Local anvil",
     chain: localAnvil,
-    checkout: address(process.env.NEXT_PUBLIC_CHECKOUT_LOCAL),
     rails: address(process.env.NEXT_PUBLIC_RAILS_LOCAL),
     railsDeployBlock: block(process.env.NEXT_PUBLIC_RAILS_DEPLOY_BLOCK_LOCAL),
-    deployBlock: undefined,
     hasExplorer: false,
   },
 };
@@ -81,5 +71,14 @@ export function networkByKey(key: string | null | undefined): Network | undefine
 
 export const walletConnectProjectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID || undefined;
 
-/** Where the "Source" links and the clone command on the Docs page point. Override it for a fork or a preview deploy. */
-export const repoUrl = (process.env.NEXT_PUBLIC_REPO_URL?.trim() || "https://github.com/qday-io/aevum-starter-kit").replace(/\.git$|\/+$/g, "");
+export const repoUrl = (process.env.NEXT_PUBLIC_REPO_URL?.trim() || "https://github.com/datharnu/pocket-rails").replace(/\.git$|\/+$/g, "");
+
+/**
+ * Demo mode: optional addresses that pre-fill forms, so a first-time visitor can create a vault, grant
+ * school billing or set a guardian in one click. Purely a convenience: every field stays editable.
+ */
+export const demo = {
+  child: address(process.env.NEXT_PUBLIC_DEMO_CHILD),
+  school: address(process.env.NEXT_PUBLIC_DEMO_SCHOOL),
+  guardian: address(process.env.NEXT_PUBLIC_DEMO_GUARDIAN),
+};

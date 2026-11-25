@@ -17,7 +17,8 @@ AI helpers can say no, never yes: every yes traces back to a parent's signature.
 | TypeScript SDK (`packages/pocket-rails`): ABI, EIP-712 intents, reason codes, outcome decoding | Done |
 | Relayer for child intents (`/api/rails/relay`) and outcome lookup (`/api/rails/tx`) | Done, tested end to end on a local chain (`pnpm example demo-flow`) |
 | Deployment to Aevum testnet | Done: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
-| Parent, child and school screens | To do |
+| Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
+| History cache for the on-chain timeline (`/api/rails/events`) | Done |
 | Guardian agent and school billing agent | To do |
 
 ---
@@ -103,6 +104,21 @@ flowchart LR
 | 12 | BillingRevoked | The parent has cancelled this billing permission. |
 
 ---
+
+## The app
+
+| Page | Who | What they can do |
+|---|---|---|
+| `/` | Everyone | What Pocket Rails is, the four roles, live counts from the contract |
+| `/parent` | Parent | Open a vault (pre-filled in demo mode), top up and withdraw, edit rules (each save is a new version), approve or remove places, allow-once or decline requests, approve or veto school charges, grant and revoke school billing, set the guardian, pause or revoke everything, read the full on-chain history |
+| `/child` | Child (phone-first) | See balance and what's left this week, pay an approved place with a live rules check before signing, see plain-language refusals with a next step, ask for an exception, pay an allowed exception, see activity. Never needs gas. |
+| `/school` | School billing key | Send charges inside the caps, watch the veto window, settle when it's over |
+| `/guardian` | Guardian key | Veto open school charges with a reason. Nothing else. |
+
+Current state (balances, rules, requests, charges) is read straight from the contract. The timeline comes
+from `/api/rails/events`, a small server-side cache: Aevum makes about 85,000 blocks a day and `eth_getLogs`
+covers at most 1,000 blocks per call, so it scans in parallel once, saves to `web/.cache/`, then only reads
+new blocks.
 
 ## Safety model
 
@@ -210,6 +226,8 @@ testnet, it prints explorer links for every step.
 | `RELAYER_DAILY_TX_LIMIT` | no | Max relayed transactions per day per server process (default 500) |
 | `TRUSTED_IP_HEADER` | on a hosted deploy | Header your host sets with the client IP (Vercel: `x-vercel-forwarded-for`) |
 | `NEXT_PUBLIC_WC_PROJECT_ID` | no | Enables WalletConnect for mobile wallets |
+| `NEXT_PUBLIC_DEMO_CHILD` / `_SCHOOL` / `_GUARDIAN` | no | Demo mode: pre-fill the parent's forms with these addresses |
+| `NEXT_PUBLIC_REPO_URL` | no | Where the "Source code" link points |
 
 **examples/.env** (see `examples/.env.example`)
 

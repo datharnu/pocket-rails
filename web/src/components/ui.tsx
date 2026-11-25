@@ -1,0 +1,172 @@
+"use client";
+
+import { txUrl } from "@aevum-kit/aevum";
+import { explainReason, type Outcome } from "@pocket-rails/sdk";
+import type { ReactNode } from "react";
+import type { Hash } from "viem";
+import { useNetwork } from "@/lib/network";
+import { short, type HistoryEvent } from "@/lib/rails";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+
+/** A transaction hash as an explorer link (on Aevum), or just the short hash (local chains). */
+export function TxLink({ hash, label }: { hash: string; label?: string }) {
+  const { net } = useNetwork();
+  if (!net.hasExplorer) return <code title={hash}>{label ?? short(hash)}</code>;
+  return (
+    <a href={txUrl(hash)} target="_blank" rel="noreferrer" className="mono" title="Open on the Aevum explorer">
+      {label ?? short(hash)} ↗
+    </a>
+  );
+}
+
+/** What happened, in plain words, with proof. "unknown" means: not confirmed yet, assume nothing. */
+export type Status =
+  | { state: "idle" }
+  | { state: "signing"; text: string }
+  | { state: "unknown"; text: string; hash?: Hash }
+  | { state: "done"; outcome: Outcome }
+  | { state: "error"; text: string };
+
+export function StatusNotice({ status, onAskException }: { status: Status; onAskException?: () => void }) {
+  if (status.state === "idle") return null;
+  if (status.state === "signing")
+    return (
+      <div className="notice info" role="status">
+        <strong>{status.text}</strong>
+        <span className="fine">Check your wallet. If no window opened, click the wallet icon in your browser toolbar.</span>
+      </div>
+    );
+  if (status.state === "unknown")
+    return (
+      <div className="notice info" role="status">
+        <strong>
+          <span className="spinner" aria-hidden="true" /> {status.text}
+        </strong>
+        <span className="fine">
+          Not confirmed yet, so nothing is assumed. {status.hash && <TxLink hash={status.hash} label="View transaction" />}
+        </span>
+      </div>
+    );
+  if (status.state === "error")
+    return (
+      <div className="notice bad" role="alert">
+        <strong>{status.text}</strong>
+      </div>
+    );
+  const o = status.outcome;
+  if (o.kind === "refuse" && o.reason !== undefined) {
+    const r = explainReason(o.reason);
+    return (
+      <div className="notice bad" role="alert">
+        <strong>Not paid: {r.message}</strong>
+        <span>{r.nextStep}</span>
+        <div className="row-between">
+          <span className="fine">
+            Refusal recorded on-chain (reason {o.reason}, {r.name}). No money moved. <TxLink hash={o.hash} label="Proof" />
+          </span>
+          {r.canAskException && onAskException && (
+            <button type="button" className="btn small secondary" onClick={onAskException}>
+              Ask for an exception
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+  const tone = o.kind === "failed" ? "bad" : o.kind === "pending" ? "warn" : "good";
+  return (
+    <div className={`notice ${tone}`} role="status">
+      <strong>{o.message}</strong>
+      <span className="fine">
+        Confirmed in block {o.blockNumber.toString()}. <TxLink hash={o.hash} label="Proof" />
+      </span>
+    </div>
+  );
+}
+
+export function NeedWallet({ role, children }: { role: string; children?: ReactNode }) {
+  return (
+    <div className="card center-card">
+      <h2>Connect the {role} wallet</h2>
+      <p className="sub">{children ?? "Use the account you set up for this role."}</p>
+      <ConnectButton />
+    </div>
+  );
+}
+
+export function NotDeployed() {
+  const { net } = useNetwork();
+  return (
+    <div className="notice warn">
+      <strong>PocketRails isn&apos;t configured on {net.label}.</strong>
+      <span>Set NEXT_PUBLIC_RAILS_{net.key.toUpperCase()} in web/.env.local and restart the app.</span>
+    </div>
+  );
+}
+
+const EVENT_TEXT: Record<string, (a: HistoryEvent["args"], label: (x: string) => string, money: (x: unknown) => string) => string> = {
+  VaultCreated: () => "Vault opened",
+  Deposited: (a, l, m) => `Topped up ${m(a.amount)} from ${l(String(a.from))}`,
+  Withdrawn: (a, _l, m) => `Parent withdrew ${m(a.amount)}`,
+  RulesChanged: (a, _l, m) => `Rules v${a.version}: ${m(a.perPaymentLimit)} per payment, ${m(a.weeklyLimit)} a week`,
+  PayeeChanged: (a, l) => `Rules v${a.version}: ${a.allowed ? "approved" : "removed"} ${a.label || l(String(a.payee))}`,
+  ChildChanged: (a) => `Rules v${a.version}: child access ${a.active ? "on" : "paused"}`,
+  GuardianChanged: (a, l) => `Rules v${a.version}: guardian ${String(a.guardian) === "0x0000000000000000000000000000000000000000" ? "removed" : `set to ${l(String(a.guardian))}`}`,
+  VaultRevoked: (a) => `Rules v${a.version}: everything revoked`,
+  Paid: (a, l, m) => `Paid ${m(a.amount)} to ${l(String(a.payee))}${String(a.exceptionId) !== "0" ? ` (exception #${a.exceptionId})` : ""}`,
+  Refused: (a, l, m) => `Refused ${m(a.amount)} to ${l(String(a.payee))}: ${explainReason(Number(a.reason)).message}`,
+  ExceptionRequested: (a, l, m) => `Exception #${a.exceptionId} requested: ${m(a.amount)} to ${l(String(a.payee))}`,
+  ExceptionDecided: (a) => `Exception #${a.exceptionId} ${a.allowed ? "allowed once" : "declined"}`,
+  BillingGranted: (a) => `Rules v${a.version}: school billing #${a.billingId} granted (${a.label || "billing"})`,
+  BillingRevoked: (a) => `Rules v${a.version}: school billing #${a.billingId} revoked`,
+  ChargeRequested: (a, _l, m) => `School charge #${a.chargeId}: ${m(a.amount)} requested`,
+  ChargeRefused: (a, _l, m) => `School charge of ${m(a.amount)} refused: ${explainReason(Number(a.reason)).message}`,
+  ChargeVetoed: (a, l) => `Charge #${a.chargeId} vetoed by ${l(String(a.by))}${a.reason ? `: “${a.reason}”` : ""}`,
+  ChargeApproved: (a) => `Charge #${a.chargeId} approved by the parent`,
+  ChargeSettled: (a, l, m) => `Charge #${a.chargeId} settled: ${m(a.amount)} to ${l(String(a.payTo))}`,
+  ChargeFailed: (a) => `Charge #${a.chargeId} failed: ${explainReason(Number(a.reason)).message}`,
+};
+
+const TONE: Record<string, string> = {
+  Paid: "good",
+  ChargeSettled: "good",
+  Deposited: "good",
+  Refused: "bad",
+  ChargeRefused: "bad",
+  ChargeFailed: "bad",
+  ChargeVetoed: "warn",
+  ExceptionRequested: "warn",
+  ChargeRequested: "warn",
+  VaultRevoked: "bad",
+};
+
+/** The on-chain history of a vault, newest first, each line linked to its transaction. */
+export function Timeline({
+  events,
+  label,
+  money,
+  loading,
+  error,
+}: {
+  events?: HistoryEvent[];
+  label: (a: string) => string;
+  money: (x: unknown) => string;
+  loading?: boolean;
+  error?: string;
+}) {
+  if (error) return <p className="empty">{error}</p>;
+  if (loading && !events) return <p className="empty">Reading history from Aevum…</p>;
+  if (!events?.length) return <p className="empty">Nothing yet.</p>;
+  return (
+    <ol className="timeline">
+      {events.map((e) => (
+        <li key={`${e.txHash}-${e.logIndex}`} className={TONE[e.eventName] ?? ""}>
+          <span className="tl-text">{EVENT_TEXT[e.eventName]?.(e.args, label, money) ?? e.eventName}</span>
+          <span className="tl-meta">
+            block {e.blockNumber} · <TxLink hash={e.txHash} />
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
