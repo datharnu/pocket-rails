@@ -1,0 +1,28 @@
+{
+  "name": "pocket-rails",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pocket Rails: staged spending freedom for children and capped school billing, enforced by a smart contract on QDay Aevum testnet (tUSD8).",
+  "license": "MIT",
+  "packageManager": "pnpm@10.8.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "typecheck": "pnpm -r typecheck",
+    "example": "pnpm --filter examples run",
+    "check:shanghai": "node tools/check-shanghai.mjs contracts/out",
+    "abi": "node tools/export-abi.mjs"
+  },
+  "pnpm": {
+    "overrides": {
+      "@base-org/account": "2.2.0",
+      "ws@>=8.0.0 <8.21.0": "^8.21.0"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

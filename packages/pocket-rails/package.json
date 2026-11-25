@@ -1,0 +1,21 @@
+{
+  "name": "@pocket-rails/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "TypeScript SDK for PocketRails: ABI, EIP-712 intents, reason codes and plain-language messages.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "viem": "^2.57.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "viem": "2.57.12"
+  }
+}
