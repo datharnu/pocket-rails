@@ -122,3 +122,16 @@ export function PanelHead({ title, sub, action }: { title: ReactNode; sub?: Reac
     </div>
   );
 }
+
+/** Charges that were let through but couldn't be paid (for example the allowance was empty). Hidden by default. */
+export function FailedToggle({ count, shown, onToggle }: { count: number; shown: boolean; onToggle: () => void }) {
+  if (count === 0) return null;
+  return (
+    <p className="fine" style={{ marginTop: 10 }}>
+      {shown ? "Showing" : "Hiding"} {count} charge{count > 1 ? "s" : ""} that couldn&apos;t be paid when they were due (for example, the allowance was empty).{" "}
+      <button type="button" className="btn small ghost" onClick={onToggle}>
+        {shown ? "Hide them" : "Show them"}
+      </button>
+    </p>
+  );
+}

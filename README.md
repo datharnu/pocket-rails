@@ -22,6 +22,17 @@ is not audited.
 | **For judges** | **[web-production-b9d9f11e.up.railway.app/judge](https://web-production-b9d9f11e.up.railway.app/judge)**: watch the guardian and the contract react to simulated problems, no wallet needed |
 | **Plain-English guide** | [docs/GUIDE.md](docs/GUIDE.md): what it is with no crypto jargon, how to test it step by step, and a demo script |
 
+## What it looks like
+
+Every page opens in **demo mode** with the showcase family's live testnet data, so you can look around without a
+wallet. Connect one to act.
+
+| | |
+|---|---|
+| ![Homepage with the live showcase card](docs/screenshots/home.png) **Home:** the showcase family's balance and latest activity, live, each with a proof link | ![Parent dashboard](docs/screenshots/parent.png) **Parent:** a dashboard for rules, money, school billing, the guardian and history; stopped charges can still be paid by the parent |
+| ![Child phone screen](docs/screenshots/child.png) **Child:** pay approved places; the app says before paying whether it will go through, and why not | ![School dashboard](docs/screenshots/school.png) **School:** what it billed, what's waiting, and what was stopped |
+| ![Guardian decisions](docs/screenshots/guardian.png) **Guardian:** every charge the AI guardian checked, what it stopped and why, with the veto's transaction | ![Judge page](docs/screenshots/judge.png) **For judges:** send a duplicate, a trick note or an over-cap charge and watch it get stopped |
+
 ## What makes Pocket Rails different
 
 1. **The school pulls charges under a veto window.** The parent grants the school a capped, expiring billing

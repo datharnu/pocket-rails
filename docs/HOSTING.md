@@ -57,8 +57,10 @@ others, and in that service's **Settings** make sure: **Root Directory** is empt
 
 ## Step 3: keep the history and notes between restarts
 
-Service → **Settings → Volumes → Add volume**, mount path **`/app/web/.cache`**. Without it, history and charge notes are
-rebuilt after each deploy (the app still works, it's just slower after a restart).
+Service → **Settings → Volumes → Add volume**, mount path **`/app/web/.cache`**. **Do this:** without it, every deploy
+wipes the charge notes (the text of each school charge, which only the app stores; the blockchain keeps just its
+fingerprint), so the screens show "no note" for older charges. The history cache is also rebuilt, which only makes
+the first page load after a deploy slower. Decisions themselves are on-chain and never lost.
 
 ## Step 4: get the public link
 

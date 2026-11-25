@@ -185,7 +185,9 @@ function LiveCard() {
   const history = useHistory(vault ? showcaseVaultId : undefined);
   const labels = useMemo(() => payeeLabels(history.data), [history.data]);
   // Newest first; a school charge appears once, with its latest outcome (stopped, paid, failed or still waiting).
-  const seen = new Set<string>();
+  // Charges that failed (e.g. sent while the allowance was empty) aren't shown here; they stay in the full History.
+  const failed = new Set((history.data ?? []).filter((e) => e.eventName === "ChargeFailed").map((e) => String(e.args.chargeId)));
+  const seen = new Set<string>(failed);
   const feed = (history.data ?? [])
     .filter((e) => {
       if (!FEED[e.eventName]) return false;
@@ -252,7 +254,6 @@ const FEED: Record<string, (e: HistoryEvent, name: (a: string) => string) => Fee
   ChargeRequested: (e) => ({ icon: "🏫", tone: "warn", title: `School asked for ${money(e.args.amount)}`, sub: `charge #${e.args.chargeId}, waiting for a check` }),
   ChargeVetoed: (e) => ({ icon: "✋", tone: "bad", title: `Charge #${e.args.chargeId} stopped`, sub: e.args.reason ? `“${String(e.args.reason).slice(0, 90)}”` : "by the guardian" }),
   ChargeSettled: (e) => ({ icon: "✓", tone: "good", title: `School charge #${e.args.chargeId} paid`, sub: money(e.args.amount) }),
-  ChargeFailed: (e) => ({ icon: "!", tone: "warn", title: `School charge #${e.args.chargeId} not paid`, sub: explainReason(Number(e.args.reason)).message }),
   ChargeRefused: (e) => ({ icon: "✗", tone: "bad", title: `School charge refused`, sub: explainReason(Number(e.args.reason)).message }),
   Deposited: (e) => ({ icon: "💵", tone: "good", title: `Topped up ${money(e.args.amount)}`, sub: "by the parent" }),
   ExceptionRequested: (e, n) => ({ icon: "🙋", tone: "warn", title: `Asked for ${money(e.args.amount)}`, sub: `to ${n(String(e.args.payee))}` }),

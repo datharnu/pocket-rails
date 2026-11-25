@@ -63,7 +63,8 @@ export default function JudgePage() {
   const history = useHistory(vaultId);
   const vault = vaults.items.find((v) => v.id === vaultId)?.data;
   const billing = billings.items.find((b) => b.id === billingId)?.data;
-  const list = charges.items.filter((c) => c.data.billingId === billingId).slice(0, 12);
+  // Charges that failed (e.g. sent while the allowance was empty) are left out; they stay in the parent's History.
+  const list = charges.items.filter((c) => c.data.billingId === billingId && c.data.status !== 5).slice(0, 12);
   const serverNote = useServerNotes(list.map((c) => c.data.memoHash));
   const simulated = new Map((info.data?.simulated ?? []).map((s) => [s.chargeId, s.kind]));
 

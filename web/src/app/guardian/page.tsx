@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { zeroAddress } from "viem";
 import { useAccount } from "wagmi";
-import { Chip, DashShell, DemoBanner, Kpi, PanelHead, type NavItem } from "@/components/dash";
+import { Chip, DashShell, DemoBanner, FailedToggle, Kpi, PanelHead, type NavItem } from "@/components/dash";
 import { Explain, Guide } from "@/components/help";
 import { NotDeployed, StatusNotice, TxLink } from "@/components/ui";
 import { noteFor } from "@/lib/childActions";
@@ -145,13 +145,13 @@ export default function GuardianPage() {
                     </button>
                   }
                 />
-                <Decisions rows={list.slice(0, 6)} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
+                <Decisions rows={list} limit={6} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
               </section>
             </>
           )}
           {current && view === "decisions" && (
             <section className="card">
-              <Decisions rows={list.slice(0, 50)} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
+              <Decisions rows={list} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
             </section>
           )}
           {current && view === "powers" && <Powers guardian={guardianAddr} />}
@@ -208,19 +208,25 @@ function Queue({ rows, note }: { rows: Row[]; note: (h: string) => string | unde
 
 function Decisions({
   rows,
+  limit = 50,
   note,
   vetoes,
   guardian,
   parent,
 }: {
   rows: Row[];
+  limit?: number;
   note: (h: string) => string | undefined;
   vetoes: Map<string, { by: string; reason: string; hash: string }>;
   guardian?: string;
   parent: string;
 }) {
+  const [showFailed, setShowFailed] = useState(false);
+  const failedCount = rows.filter((r) => r.data.status === 5).length;
+  const shown = (showFailed ? rows : rows.filter((r) => r.data.status !== 5)).slice(0, limit);
   if (rows.length === 0) return <p className="empty">No school charges yet.</p>;
   return (
+    <>
     <div className="table-wrap">
       <table className="table">
         <thead>
@@ -232,7 +238,7 @@ function Decisions({
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ id, data: c }) => {
+          {shown.map(({ id, data: c }) => {
             const v = vetoes.get(id.toString());
             const by = v ? (sameAddr(v.by, guardian) ? "guardian" : sameAddr(v.by, parent) ? "parent" : short(v.by)) : "guardian";
             return (
@@ -260,7 +266,7 @@ function Decisions({
                   ) : c.status === 1 ? (
                     <Chip tone="info">Let through, not collected yet</Chip>
                   ) : (
-                    <Chip tone="bad">Failed</Chip>
+                    <Chip tone="plain">Couldn&apos;t be paid</Chip>
                   )}
                 </td>
               </tr>
@@ -269,8 +275,11 @@ function Decisions({
         </tbody>
       </table>
     </div>
+    <FailedToggle count={failedCount} shown={showFailed} onToggle={() => setShowFailed((x) => !x)} />
+    </>
   );
 }
+
 
 function Powers({ guardian }: { guardian?: string }) {
   return (

@@ -3,7 +3,7 @@
 import { explainReason, memoHash } from "@pocket-rails/sdk";
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { Chip, DashShell, DemoBanner, Kpi, PanelHead, type NavItem } from "@/components/dash";
+import { Chip, DashShell, DemoBanner, FailedToggle, Kpi, PanelHead, type NavItem } from "@/components/dash";
 import { Explain, Guide } from "@/components/help";
 import { NotDeployed, StatusNotice } from "@/components/ui";
 import { rememberNote, noteFor } from "@/lib/childActions";
@@ -141,14 +141,14 @@ export default function SchoolPage() {
                     </button>
                   }
                 />
-                <ChargeTable rows={list.slice(0, 6)} billings={mine} />
+                <ChargeTable rows={list} billings={mine} limit={6} />
               </section>
             </>
           )}
           {mine.length > 0 && view === "send" && <SendCharge permissions={mine.filter((b) => isLive(b.data))} />}
           {mine.length > 0 && view === "charges" && (
             <section className="card">
-              <ChargeTable rows={list.slice(0, 50)} billings={mine} />
+              <ChargeTable rows={list} billings={mine} />
               <p className="fine" style={{ marginTop: 12 }}>
                 Over-cap charges aren&apos;t errors: they&apos;re recorded as refusals ({explainReason(9).message.toLowerCase()}) with a transaction you can show.
               </p>
@@ -164,17 +164,20 @@ export default function SchoolPage() {
 function statusChip(c: Charge) {
   if (c.status === 4) return <Chip tone="good">✓ Paid</Chip>;
   if (c.status === 3) return <Chip tone="bad">✋ Stopped</Chip>;
-  if (c.status === 5) return <Chip tone="bad">Failed</Chip>;
+  if (c.status === 5) return <Chip tone="plain">Couldn&apos;t be paid</Chip>;
   if (c.status === 2) return <Chip tone="warn">Waiting for parent</Chip>;
   if (nowSec() >= c.settleAfter) return <Chip tone="info">Ready to collect</Chip>;
   return <Chip tone="warn">⏳ {timeLeft(c.settleAfter)} left</Chip>;
 }
 
-function ChargeTable({ rows, billings }: { rows: Row[]; billings: { id: bigint; data: Billing }[] }) {
+function ChargeTable({ rows, billings, limit = 50 }: { rows: Row[]; billings: { id: bigint; data: Billing }[]; limit?: number }) {
   const write = useRailsWrite();
   const { status, run, busy } = useAction();
   const serverNote = useServerNotes(rows.map((c) => c.data.memoHash));
   const vaultOf = new Map(billings.map((b) => [b.id, b.data.vaultId]));
+  const [showFailed, setShowFailed] = useState(false);
+  const failedCount = rows.filter((r) => r.data.status === 5).length;
+  const shown = (showFailed ? rows : rows.filter((r) => r.data.status !== 5)).slice(0, limit);
   if (rows.length === 0) return <p className="empty">No charges yet.</p>;
   return (
     <>
@@ -190,7 +193,7 @@ function ChargeTable({ rows, billings }: { rows: Row[]; billings: { id: bigint; 
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ id, data: c }) => {
+            {shown.map(({ id, data: c }) => {
               const ready = c.status === 1 && nowSec() >= c.settleAfter;
               return (
                 <tr key={id.toString()}>
@@ -213,6 +216,7 @@ function ChargeTable({ rows, billings }: { rows: Row[]; billings: { id: bigint; 
           </tbody>
         </table>
       </div>
+      <FailedToggle count={failedCount} shown={showFailed} onToggle={() => setShowFailed((x) => !x)} />
       <StatusNotice status={status} />
     </>
   );

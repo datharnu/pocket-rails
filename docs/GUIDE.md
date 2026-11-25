@@ -1,7 +1,7 @@
 # Pocket Rails: the plain-English guide
 
 This guide explains what Pocket Rails is, how it works and how to test and demo it, without assuming you know
-anything about crypto. Read sections 1 to 4 once to understand it. Use sections 7 to 9 when you test or demo.
+anything about crypto. Read sections 1 to 4 once to understand it. Use sections 6 to 9 when you test or demo. You can look around without any wallet (section 6).
 
 ---
 
@@ -34,7 +34,7 @@ money is a test **stablecoin** (a digital dollar). You don't need those words to
 | 🧑‍🍼 **Parent** | Mum or Dad | Put money in, set and change the rules, say yes once to a request, give the school permission to bill, approve or stop school charges, pause or stop everything, take money out | (Nothing is off-limits: the parent is in charge) |
 | 🎒 **Child** | A secondary-school student | Pay approved places inside the rules, ask the parent for an exception | Break the rules, change them, take money out |
 | 🏫 **School** | The school's office, or its billing helper | Ask for money (meals, trips) inside the limits the parent set, and collect it after the waiting time | Take more than the limits, skip the waiting time, send money anywhere except the school's own account |
-| 🛡️ **Guardian** | A helper, here an AI agent | Stop a school charge that looks wrong during its waiting time | Approve anything, raise a limit, move money |
+| 🚦 **Guardian** | A helper, here an AI agent | Stop a school charge that looks wrong during its waiting time | Approve anything, raise a limit, move money |
 | 🤖 **Robot cashier** (smart contract) | Code living on the Aevum blockchain | Hold the money, check every payment against the rules, record every decision | Ignore the rules. Nobody can switch it off or change it |
 | 📮 **Messenger** (relayer) | The app's server | Deliver the child's payments to the robot cashier and pay the small delivery fee | Change a payment or make one the rules don't allow |
 
@@ -104,153 +104,154 @@ charges by the billing permission the parent gave.
 
 ## 5. What we built and where it lives
 
-| Piece | Where it is | Does it need to be running? |
+| Piece | Where it is | Does it need you? |
 |---|---|---|
-| The robot cashier (smart contract) | On Aevum. Current version (v2): `0xB179197A660029b1d96FEF09e3E8515b271E3801` ([see it](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract)). The first version (v1) holds the earlier demo runs. | No. It's always there. |
-| The app (screens + messenger) | On your Mac for now: [http://localhost:3000](http://localhost:3000) | Yes, while you test or demo. (A public link comes with hosting.) |
-| School billing agent | `agents/` folder, runs in a terminal | Only when you want the school to bill automatically |
-| Guardian agent | `agents/` folder, runs in a terminal | Only when you want automatic checking |
-| Proof of earlier runs | [DEMO_RUN.md](DEMO_RUN.md) | No |
+| The robot cashier (smart contract) | On Aevum. Current version (v2): `0xB179197A660029b1d96FEF09e3E8515b271E3801` ([see it](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract)). | No. It's always there. |
+| The app (screens + messenger) | Hosted on Railway: **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)** | No. It runs 24/7. (You can still run it on your Mac with `pnpm dev`.) |
+| School billing agent | Hosted on Railway, in the same service as the app | No. It bills one lunch per school day on the showcase allowance and collects it after the waiting time. |
+| Guardian agent | Hosted on Railway. It acts through the guardian **smart account** `0x4D22…31B0`, whose key can only stop charges | No. It checks every school charge on allowances it guards. |
+| Proof | [EVIDENCE.md](EVIDENCE.md) (every v2 feature, live) and [DEMO_RUN.md](DEMO_RUN.md) (the first runs) | No |
+
+**The showcase allowance (#1)** is the family everyone sees: the homepage card, demo mode on every page and the
+judge page all show it. It holds about 3 tUSD8 (around 30 lunches) and the hosted agents keep it active. Try not
+to pause or revoke it, and if you use it for testing, put back what you take out.
 
 ---
 
-## 6. Your five accounts
+## 6. Look around without a wallet (demo mode)
 
-All five are in MetaMask. Balances are from 25 Nov 2026 and change as you test.
+Open the [live app](https://web-production-b9d9f11e.up.railway.app) in any browser. No wallet, no MetaMask.
+
+| Page | What you see |
+|---|---|
+| **Home** | A live card with the showcase family's balance and latest activity, each with a "proof" link, plus the numbers (tests, AI evaluation) and Ada's week. |
+| **🧑‍🍼 Parent** | The parent's dashboard for allowance #1. Use the left menu: **Overview** (balance, spending, money set aside, anything waiting), **Money**, **Rules & places**, **School billing**, **Guardian**, **History**, **Pause & stop**. |
+| **🎒 Child** | The child's phone screen. Tap a place and type an amount: it tells you straight away whether it would go through and why. |
+| **🏫 School** | The school's dashboard: what it billed, what's waiting, the charges table and its permission. |
+| **🚦 Guardian** | What the AI guardian checked, what it stopped and why (with the veto's proof link), and what it can and can't do. |
+| **🧑‍⚖️ For judges** | Buttons that send a labelled, simulated problem charge (a duplicate, a trick note, too much money) and show the guardian or the contract react within seconds. |
+
+A yellow **"Demo mode · live testnet data, read-only"** bar explains this. Buttons show but are locked. Connect a
+wallet to act; the page then switches to your own account. Each dashboard section has its own link, for
+example `web-production-b9d9f11e.up.railway.app/parent#history`.
+
+---
+
+## 7. Your accounts
+
+All are in MetaMask. Balances from 25 Nov 2026, late evening; they change as you test.
 
 | Account | Role | Holds now | Needs |
 |---|---|---|---|
-| Parent `0xD035…a485` | Parent | 1.5 tUSD8, 0.69 tQDAY | tUSD8 to top up, a little tQDAY for fees |
-| Child `0x7961…0d16` | Child | nothing | nothing (the messenger pays fees) |
-| Relayer `0xF534…016E` | Messenger (the app's server) | 0.199 tQDAY | tQDAY for fees (enough for hundreds of payments) |
-| School `0x8C6a…368F` | School billing | 1.9 tUSD8 (from meals and canteen), 0.049 tQDAY | a little tQDAY for fees |
-| Guardian `0xEA66…00db` | Guardian | 0.05 tQDAY | a little tQDAY for fees (vetoes only) |
+| Parent `0xD035…a485` | Parent of allowance #1 (and of #2, the evidence run) | 0.1 tUSD8, 0.51 tQDAY | a little tQDAY for fees |
+| Child `0x7961…0d16` | Child of allowance #1 | nothing | nothing (the messenger pays fees) |
+| Relayer `0xF534…016E` | Messenger (the app's server) | 0.198 tQDAY | tQDAY for fees (enough for hundreds of payments) |
+| School `0x8C6a…368F` | School canteen + billing key of allowance #1 | 0.1 tQDAY | a little tQDAY for fees |
+| Guardian `0xEA66…00db` | Owner of the guardian smart account | 0.039 tQDAY | almost nothing |
+| Guardian smart account `0x4D22…31B0` | The guardian of allowance #1 | 0.109 tQDAY | tQDAY for its vetoes (about 0.0003 each) |
 
-The current contract (v2) is new and empty: you'll open a fresh allowance in Part 1. The School account holds 1.9 tUSD8 from earlier demos, which you can send back to Parent to fund testing.
+Most of the money is inside allowance #1 (3 tUSD8). Lunches paid to the School account can be sent back to
+Parent in MetaMask whenever you need tUSD8 for testing.
 
 **Keys:** the private keys live only in files that never go to GitHub: `web/.env.local` (Relayer),
-`examples/.env` (Parent, Child) and `agents/.env` (School, Guardian). Never paste a key into a file ending in
-`.example`, and never paste one into a chat.
+`examples/.env` (Parent, Child) and `agents/.env` (School, Guardian). Railway only has the Relayer key, the
+School key and the guardian's veto-only session key. Never paste a key into a file ending in `.example`, and never
+paste one into a chat.
 
 ---
 
-## 7. Before you test or demo: checklist
+## 8. Full test with a wallet, step by step
 
-1. **Start the app.** Open Terminal and run:
-   ```
-   cd ~/Desktop/Odun.Dev/pocket-rails
-   nvm use 22
-   pnpm dev
-   ```
-   Wait for "Ready", then open [http://localhost:3000](http://localhost:3000). Leave this terminal open.
-2. **MetaMask:** the network is **QDay Aevum Testnet**, and tUSD8 is added as a token
-   (`0x456569838f1d43009A91ebA4263147Afd7233483`, 6 decimals).
-3. **Switching roles:** in MetaMask, pick another account (Parent, Child, School, Guardian). If the app says
-   it isn't connected, click **Connect Wallet** and choose that account. The app always acts as whichever
-   account MetaMask has selected.
-4. **Fresh contract:** the app and agents now use v2 (it adds money set aside for school). v2 starts with no
-   allowances and no billing permissions, so Part 1 opens a new allowance. A billing permission's weekly limit
-   restarts 7 days after it was granted; the child's weekly limit restarts every Monday 00:00 UTC.
-5. **Agents' settings** are in `agents/.env`. Right now they're in demo mode: a meal every 2 minutes
-   (`BILL_EVERY=120`), one "trick" charge to test the AI (`DEMO_SCENARIO=trick`), and AI review on
-   (`AI_REVIEW=1`).
+Use the [live app](https://web-production-b9d9f11e.up.railway.app) and MetaMask on **QDay Aevum Testnet** (tUSD8 is
+`0x456569838f1d43009A91ebA4263147Afd7233483`, 6 decimals). The app always acts as whichever account MetaMask has
+selected: switch accounts in MetaMask, then reload the page if it still shows the old one.
 
----
-
-## 8. Full test, step by step
-
-Do the parts in order. Each step says which account to use, what to click and what you should see.
-Amounts are chosen to fit the money you have: 1.5 tUSD8 in Parent, plus 1.9 you'll move from School.
-
-### Part 1: the parent gets ready (account: Parent, page: Parent)
+### Part 1: the parent's dashboard (account: Parent)
 
 | # | Do this | You should see |
 |---|---|---|
-| 1.0 | Switch MetaMask to **School**, send **1.9 tUSD8** to the Parent address (`0xD035…a485`) | Parent now holds 3.4 tUSD8. (One-time money move.) |
-| 1.1 | Switch to **Parent**, open [localhost:3000/parent](http://localhost:3000/parent) | **Allowance #1** already exists on v2 (it was opened for the smart-account guardian test, with School billing and the guardian set). Use it. |
-| 1.2 | (Only if you want a second allowance) Click **+ New allowance**, then **Open allowance** | A new allowance tab. You'd then need to set its guardian and school billing yourself. |
-| 1.3 | In **💵 Money**, type `2`, click **Top up**, confirm twice (allow, then deposit) | Balance shows **2 tUSD8**. |
-| 1.4 | In **💵 Money**, under **🚌 Set aside for school**, type `0.9`, click **Save amount set aside**, confirm | "0.9 set aside, so your child can spend 1.1". Rules go up one version. |
+| 1.1 | Open **Parent** and click **Connect Wallet** (choose Parent) | The yellow demo bar goes away, the sidebar shows **● Connected · You**, and the dashboard opens on **allowance #1**. |
+| 1.2 | Look at **Overview** | Four cards: Balance, Spent this week (with a bar), Set aside for school, Waiting for a decision. Below: anything waiting, recent activity and "Rules at a glance". |
+| 1.3 | Open **Money**. Under **🚌 Set aside for school**, type `1`, click **Save amount set aside**, confirm in MetaMask | "Now 1 is set aside, so your child can spend 2". The rules go up one version. |
 
-### Part 2: the child pays (account: Child, page: Child)
+### Part 2: the child pays (account: Child)
 
 | # | Do this | You should see |
 |---|---|---|
-| 2.1 | Switch MetaMask to **Child**, open [localhost:3000/child](http://localhost:3000/child) | The orange allowance card with 2 tUSD8, "🚌 0.9 set aside for school · you can spend 1.1", and "School canteen" as an approved place. |
+| 2.1 | Switch MetaMask to **Child**, open **Child** | The orange allowance card, "🚌 1 set aside for school · you can spend 2", and "School canteen" as an approved place. |
 | 2.2 | Tap **School canteen**, type `0.3`, tap **Pay**, sign in MetaMask (free) | "✓ Inside your rules" before you pay, then **Paid** with a "See the record" link. |
-| 2.3 | Type `0.6`, tap **Pay** (more than the 0.50 per-payment limit) | Before paying: "✗ This is more than you can spend in one payment." If you pay anyway: **"That didn't go through, and that's okay"**, the reason, and "No money moved. The refusal is recorded on Aevum". |
-| 2.4 | Tap **Ask for an exception** (the amount stays 0.6), add a note like `Museum trip snacks`, tap **Send request to parent**, sign | "Request sent. Waiting for your parent." It appears under **📨 My requests** as "Waiting for parent". |
+| 2.3 | Type `0.6`, tap **Pay** | Before paying: "✗ This is more than you can spend in one payment." If you pay anyway: **"That didn't go through, and that's okay"**, the reason, and "No money moved. The refusal is recorded on Aevum". |
+| 2.4 | Tap **Ask for an exception** (the amount stays 0.6), add a note like `Museum trip snacks`, tap **Send request to parent**, sign | "Request sent. Waiting for your parent." It appears under **📨 My requests**. |
 
-### Part 3: the parent answers (account: Parent, page: Parent)
-
-| # | Do this | You should see |
-|---|---|---|
-| 3.1 | Switch to **Parent**, open the Parent page | "What to do next": **Your child is asking for something**. |
-| 3.2 | In **🙋 Requests from your child**, click **Allow once**, confirm | Confirmed. The request disappears from the list. Your everyday rules (version number) don't change. |
-
-### Part 4: the child uses the exception (account: Child, page: Child)
+### Part 3: the parent answers (account: Parent)
 
 | # | Do this | You should see |
 |---|---|---|
-| 4.1 | Switch to **Child**, open the Child page | "What to do next": **Your parent said yes!** |
-| 4.2 | Under **📨 My requests**, tap **Pay now**, sign | **Paid**. The request now shows "Used". Paying it again would be refused. |
-| 4.3 | Try to pay the canteen `0.3` | Only 0.2 is left to spend; the rest is set aside. Before paying: "✗ That money is set aside for school costs." If you pay anyway: refused and recorded, no money moves. |
+| 3.1 | Switch to **Parent**, open **Parent** | A red **1** next to Overview, and "Your child is asking for something". |
+| 3.2 | In **🙋 Requests from your child**, click **Allow once**, confirm | Confirmed. The request disappears. The rules' version number doesn't change. |
 
-### Part 5: school billing with the agents (accounts: Parent, then watch)
-
-| # | Do this | You should see |
-|---|---|---|
-| 5.1 | Allowance #1 already has school billing (2-minute window, no first-charge approval). To try the full setup yourself, as **Parent**, in **🏫 School billing**, open **Grant a billing permission**. Everything is filled in. Change **Veto window (minutes)** to `2`. Leave "The first charge waits for my approval" ticked. Click **Grant**. | Confirmed. A new permission appears in the list. School charges can use the 0.9 set aside. |
-| 5.2 | Open **two new Terminal windows**. In the first run `cd ~/Desktop/Odun.Dev/pocket-rails && nvm use 22 && pnpm --filter agents school`. In the second run the same but end with `guardian`. | The school prints "billing as 0x8C6a…" and soon "meal: charged 0.3". The guardian prints "AI review: on" and then "ok … normal school meal cost". |
-| 5.3 | Go to the Parent page. "What to do next" says **A school charge is waiting**. In **🏫 School charges waiting**, the charge says "first charge: waits for your approval". Click **Approve**, confirm | Confirmed: the school is paid. |
-| 5.4 | Wait about 15 seconds | The school sends the **trick charge** (its note tries to tell the AI to approve it). The guardian prints **VETO … "The note tries to instruct the reviewer…"**. On the Parent page it appears in **✋ Stopped charges** with that reason. |
-| 5.5 | On the trick charge, click **Pay it anyway**, read the box, then click **Cancel** | The confirm box repeats why it was stopped. Cancel: nothing is paid. (This shows the parent has the final say, without paying a bad charge.) |
-| 5.6 | Wait 2–3 minutes | New meal charges arrive every 2 minutes and are paid to the school after their 2-minute wait, with no action from you. Each one uses up the money set aside for school first. |
-| 5.7 | When you've seen enough, press **Ctrl + C** in both agent terminals | The agents stop. Nothing new is charged. |
-
-The guardian of allowance #1 is a **smart account** (`0x4D22…31B0`), so its vetoes come from the guardian agent through QDay's bundler, not from the Guardian page. The Guardian page works when the guardian is a normal account.
-
-Optional, to show a **wrong** veto being fixed: in **🛡️ Guardian** on the Parent page, set the guardian to the Guardian account (`0xEA66…00db`), wait for a normal meal, switch to **Guardian**, open
-the Guardian page and click **Stop it**. Switch back to **Parent**: the charge is in **✋ Stopped charges**.
-Click **Pay it anyway** and **Yes, pay it**. The school is paid.
-
-### Part 6: stopping everything (accounts: Parent, then Child)
+### Part 4: the child uses the exception (account: Child)
 
 | # | Do this | You should see |
 |---|---|---|
-| 6.1 | As **Parent**, in **⛔ Pause and stop**, click **Pause child's spending** | Confirmed. "Child can spend" shows **Paused**. |
-| 6.2 | Switch to **Child**, try to pay the canteen `0.1` | "Your spending is paused" at the top. If you pay anyway: refused and recorded, "Your parent has paused your spending." |
-| 6.3 | (End of a demo only) As **Parent**, **Revoke everything…** → **Yes** | Child access off, all school billing and pending charges stopped. The money stays in the allowance. |
+| 4.1 | Switch to **Child**, open **Child** | **Your parent said yes!** |
+| 4.2 | Under **📨 My requests**, tap **Pay now**, sign | **Paid**. The request now shows "Used". |
+| 4.3 | Type `2`, tap the canteen | "✗ That money is set aside for school costs." (Only what isn't set aside can be spent.) |
+
+### Part 5: school billing and the AI guardian (no wallet needed)
+
+The hosted agents do this part by themselves. Watch it:
+
+| # | Do this | You should see |
+|---|---|---|
+| 5.1 | On a school day, open **School** → **Charges** | The day's lunch (0.1). It waits 2 minutes, then shows **✓ Paid**. It's paid from the money set aside first. |
+| 5.2 | Open **For judges**, click **Send a trick note** | Within about 30 seconds: "Vetoed by the guardian smart account", with the AI's reason. |
+| 5.3 | Open **Guardian** → **Decisions** | The trick charge: **✋ Stopped by the guardian**, the reason, and a "See the veto" link. |
+| 5.4 | As **Parent**, open **School billing** | The same charge under **✋ Stopped charges**. Click **Pay it anyway**, read the box, then **Cancel**. (Only the parent could pay it. Don't pay the trick one.) |
+
+The judge buttons are limited to 4 per visitor per hour and 30 a day.
+
+### Part 6: stop and restart (account: Parent, then Child)
+
+| # | Do this | You should see |
+|---|---|---|
+| 6.1 | As **Parent**, open **Pause & stop**, click **Pause spending** | Confirmed. The status chip shows **⏸ Child paused**. |
+| 6.2 | Switch to **Child**, try to pay the canteen `0.1` | "Your spending is paused". If you pay anyway: refused and recorded. |
+| 6.3 | As **Parent**, **Pause & stop** → **Turn spending back on** | Spending works again. Requests signed before the pause stay cancelled. |
+| 6.4 | Put the showcase back: **Money** → set aside `0` again, and leave the child turned on | The showcase family is back to normal for judges. |
+
+Don't use **Revoke everything** on allowance #1: it would also cancel the school's billing permission and the
+judge page would stop working.
 
 ### Part 7: show the proof
 
 | # | Do this | You should see |
 |---|---|---|
-| 7.1 | Parent page → **🧾 History** | Every payment, refusal, request, rule change, school charge and veto, newest first, each with a link. |
-| 7.2 | Click any link | The transaction on the Aevum explorer, the public record anyone can check. |
-| 7.3 | Open the [contract on the explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract) | The verified source code of the robot cashier. |
+| 7.1 | Parent → **History** | Every payment, refusal, request, rule change, school charge and veto, newest first, each with a link. |
+| 7.2 | Click any link | The transaction on the Aevum explorer: the public record anyone can check. |
+| 7.3 | Open [EVIDENCE.md](EVIDENCE.md) | Every v2 feature run live through the hosted app and guardian: 29 checked steps, each with its transaction. |
 
 ---
 
 ## 9. A 3–4 minute demo for judges
 
-Practise this once with the steps above. Have Parent and Child ready in MetaMask, the app open, and the two
-agent terminals ready to start.
+No terminals needed: everything runs on the live site. Have Parent and Child ready in MetaMask.
 
 | Time | Show | Say |
 |---|---|---|
-| 0:00 | Home page (Ada's story) | "Parents either approve every payment or hand over a card with no limits. Pocket Rails sits in between: the parent sets the rules once, the child pays inside them, and the school can bill too, under limits." |
-| 0:30 | Parent page: rules, places, balance | "These rules live inside a smart contract that holds the money. No screen or server can get around them." |
+| 0:00 | Home page: the live card and the numbers | "Parents either approve every payment or hand over a card with no limits. Pocket Rails sits in between: the parent sets the rules once, the child pays inside them, and the school bills under limits. This card is a real family on the testnet, live." |
+| 0:30 | Parent dashboard: Overview, then Rules & places | "These rules live inside a smart contract that holds the money. No screen or server can get around them." |
 | 0:50 | Child page: pay 0.3 → Paid | "Inside the rules, it just works. The child never pays fees." |
-| 1:10 | Child: try 0.6 → kind refusal → ask for exception | "Outside the rules, nothing moves, but the refusal is recorded with a reason, and the child is told what to do next." |
+| 1:10 | Child: try 0.6 → kind refusal → ask for an exception | "Outside the rules, nothing moves, but the refusal is recorded with a reason, and the child is told what to do next." |
 | 1:40 | Parent: Allow once → Child: Pay now | "The parent says yes to that exact payment, once. The everyday rules don't change." |
-| 2:00 | Child tries to spend the bus-pass money → refused | "Mum set 0.90 aside for school costs. Ada can't spend it on snacks, but the school can still collect it." |
-| 2:10 | Parent: school billing; agents running; first charge → Approve | "The school bills the same allowance under a permission the parent signed. Every charge waits a few minutes." |
-| 2:40 | Guardian vetoes the trick charge; Stopped charges shows the AI's reason | "This charge's note tries to talk the AI into approving it. The guardian caught it. And the guardian can only ever say no. Only the parent can say yes." |
-| 3:10 | Pause child → payment refused; History panel and explorer link | "One tap pauses everything, and every decision has a public receipt." |
+| 2:00 | Child: try to spend the money set aside → refused | "Mum set money aside for school costs. Ada can't spend it on snacks, but the school can still collect it." |
+| 2:15 | For judges: **Send a trick note** → vetoed | "This charge's note tries to talk the AI into approving it. The guardian caught it, from a smart account whose key can only say no." |
+| 2:45 | Guardian → Decisions; Parent → Stopped charges → Pay it anyway → Cancel | "Every stop shows its reason and its proof. The guardian can never say yes. Only the parent can, and here she could still pay it." |
+| 3:10 | Pause & stop → pause; Child refused; History → explorer link | "One tap pauses everything, and every decision has a public receipt." |
 | 3:30 | Close | "AI can say no, never yes. Every yes traces back to a permission the parent signed." |
 
-Short answers to likely questions are in [PITCH.md](PITCH.md).
+Short answers to likely questions are in [PITCH.md](PITCH.md). Afterwards, turn the child's spending back on
+(step 6.3).
 
 ---
 
@@ -258,30 +259,29 @@ Short answers to likely questions are in [PITCH.md](PITCH.md).
 
 | Problem | What to do |
 |---|---|
-| The page says "Your wallet is on another network" | Click **Switch network** in the yellow bar, or pick QDay Aevum Testnet in MetaMask. |
+| The page shows the yellow "Demo mode" bar although I connected | The wallet isn't connected to this site yet. Click **Connect wallet** in the bar. |
+| The page shows someone else's data | MetaMask is on a different account. Switch to the right one and reload. |
+| "Your wallet is on another network" | Click **Switch network** in the yellow bar, or pick QDay Aevum Testnet in MetaMask. |
 | Nothing happens when I click a button | Look for the MetaMask pop-up. If none opened, click the MetaMask fox icon in the browser toolbar. |
-| "Connect the … wallet" | Click **Connect Wallet** and choose the account for that role. |
+| A button is greyed out | In demo mode all action buttons are locked. Otherwise check the amount: the button stays grey if it's above what's allowed or available. |
 | The child sees "No allowance for this account yet" | MetaMask is on the wrong account. Switch to **Child**. |
-| The school agent says "this period's cap is reached" | That permission's weekly limit is used up. Grant a new billing permission (step 5.1) or wait for its week to restart. |
-| A payment says "the relayer is out of gas" | Send the Relayer account a little tQDAY from Parent in MetaMask (0.1 is plenty). |
-| The relayer is down and the child sees "Plan B: send it yourself" | Either fix the app, or give the Child account a tiny bit of tQDAY and tap **Send it myself**. |
-| "Not enough in the allowance" / balance too low | Top up from the Parent page. If the Parent wallet is empty, get more tUSD8 from the Discord faucet (`/faucet <address>` in #faucet, once per Discord account) or ask a teammate to claim and send it. |
-| The agents print "poll failed, retrying" | Usually a short network hiccup. If it repeats, check the app is running and `agents/.env` has `RAILS_ADDRESS` set. |
+| The judge page says the live demo isn't on, or "Waiting for the guardian" never finishes | See [HOSTING.md](HOSTING.md#troubleshooting). Usually the School account or the guardian smart account needs a little tQDAY. |
+| "Not enough in the allowance" | Top up allowance #1 from **Money**. If the Parent wallet is empty, send the School account's tUSD8 back to Parent first. |
+| A payment says "the relayer is out of gas" | Send the Relayer account a little tQDAY from Parent (0.1 is plenty). |
+| The relayer is down and the child sees "Plan B: send it yourself" | Give the Child account a tiny bit of tQDAY and tap **Send it myself**. |
 | I pasted a key in the wrong file | Tell your developer before committing anything. The commit check blocks keys, but the file should be fixed. |
 
 ---
 
-## 11. Command cheat sheet
+## 11. Command cheat sheet (only if you run things on your Mac)
 
 Run these from the `pocket-rails` folder (`cd ~/Desktop/Odun.Dev/pocket-rails`), after `nvm use 22`.
 
 | What | Command |
 |---|---|
-| Start the app | `pnpm dev` |
-| Start the school billing agent | `pnpm --filter agents school` |
-| Start the guardian agent | `pnpm --filter agents guardian` |
+| Start the app locally | `pnpm dev`, then open [localhost:3000](http://localhost:3000) |
+| Start the agents locally (only if they're **not** running on Railway, or they'd both act) | `pnpm --filter agents school` and `pnpm --filter agents guardian` |
 | Stop anything running in a terminal | **Ctrl + C** |
-| Run the whole child flow automatically (uses 2 tUSD8 of the Parent's) | `pnpm example demo-flow` (with the app running) |
+| Re-run the evidence run (about 1.2 tUSD8 and 5 minutes) | see [EVIDENCE.md](EVIDENCE.md#run-it-again) |
 | Run the contract tests | `make test FORGE=/opt/homebrew/bin/forge` |
-
-For everyday (non-demo) school billing, set `BILL_EVERY=day` and clear `DEMO_SCENARIO` in `agents/.env`.
+| Print the Railway settings | `node tools/railway-vars.mjs` |
