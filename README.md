@@ -15,7 +15,7 @@
   <a href="https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view"><img alt="Demo video" src="https://img.shields.io/badge/demo%20video-2%3A52-FF6B4A?style=flat-square"></a>
   <a href="https://web-production-b9d9f11e.up.railway.app"><img alt="Live app" src="https://img.shields.io/badge/live%20app-online-22A06B?style=flat-square"></a>
   <a href="https://web-production-b9d9f11e.up.railway.app/judge"><img alt="For judges" src="https://img.shields.io/badge/for%20judges-no%20wallet%20needed-C93D25?style=flat-square"></a>
-  <a href="docs/EVIDENCE.md"><img alt="Evidence" src="https://img.shields.io/badge/evidence-29%2F29%20live%20checks-1F6FB8?style=flat-square"></a>
+  <a href="docs/EVIDENCE.md"><img alt="Evidence" src="https://img.shields.io/badge/evidence-33%2F33%20live%20checks-1F6FB8?style=flat-square"></a>
   <a href="contracts/test"><img alt="Tests" src="https://img.shields.io/badge/contract%20tests-76%20%2B%2012%20fork-1F2A44?style=flat-square"></a>
   <a href="docs/AI_EVAL.md"><img alt="AI guardian eval" src="https://img.shields.io/badge/AI%20guardian%20eval-50%2F50-F5A524?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-5B6478?style=flat-square"></a>
@@ -47,7 +47,7 @@ is not audited.
 | **Demo video** | **[Watch it (2:52)](https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view)**: a child pays and is refused, the school bills, and the AI guardian stops a trick charge, all live on Aevum |
 | **Live app** | **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)**, with the school billing agent and the guardian smart account running 24/7 on Railway |
 | **Contract** | v3 [`0xa37f…E05c` on the Aevum explorer](https://explorer-test.qday.info/address/0xa37f27487562a1595768A681Ee21D3e93FFcE05c) (source verified); v2 [`0xB179…3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) and v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) keep the earlier live runs |
-| **Evidence** | [docs/EVIDENCE.md](docs/EVIDENCE.md): every v2 feature run live through the hosted app and AI guardian, 29/29 checks, each with its transaction |
+| **Evidence** | [docs/EVIDENCE.md](docs/EVIDENCE.md): every v3 feature run live through the hosted app and AI guardian, 33/33 checks, each with its transaction (and the earlier v2 run, 29/29) |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): the first runs, and how the guardian smart account was set up |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
 | **Guardian evaluation** | [docs/AI_EVAL.md](docs/AI_EVAL.md): 50 frozen test notes; rules + AI vetoed 30/30 bad charges (16/16 prompt injections) with 0/16 genuine charges wrongly vetoed |
@@ -99,26 +99,29 @@ wallet. Connect one to act.
 
 ## See it in 60 seconds
 
-Recorded on v2 through the hosted app and the hosted AI guardian ([docs/EVIDENCE.md](docs/EVIDENCE.md) has all 29 steps):
+Recorded on v3 through the hosted app and the hosted AI guardian ([docs/EVIDENCE.md](docs/EVIDENCE.md) has all 33 steps):
 
-1. **The child pays on their own, with no gas.** [Paid](https://explorer-test.qday.info/tx/0xbcc37153a36a8b75df7d93665535fc1e561702e003afad1c553fb811d57b56fd); the child's account
+1. **The child pays on their own, with no gas.** [Paid](https://explorer-test.qday.info/tx/0x96085cee14d05b7d40fab7c9d9e4b91f88b892543d74b3a2a1b5f3ab68abadd0); the child's account
    held 0 tQDAY for the whole run.
 2. **A payment that breaks a rule is refused and recorded.** "This is more than you can spend in one payment.":
-   [refusal](https://explorer-test.qday.info/tx/0x37ba00b25952b073b806d4246b040e33dc6fa0e465e7af4d6dbe144f55a28ae8).
+   [refusal](https://explorer-test.qday.info/tx/0xe84e803470cfb883c2785385429c4a5822785e5398d539da755b0142885c5326).
 3. **A one-time exception.** The child asks, the parent allows it once, the exact payment goes through and a
-   second use is refused: [request](https://explorer-test.qday.info/tx/0xe6f38a2810ba69c3685e8e070956997134d5209964f93c96206626c36f913c6f), [allow once](https://explorer-test.qday.info/tx/0xb79041e8d19d83c0d72448f83819a682373a02489831e20b13bf0350fbcbfd77),
-   [paid](https://explorer-test.qday.info/tx/0xf81eac74c8a454e4e94649db2d63a10468e2bf919bef2703b7a8461fb1d637a2), [reuse refused](https://explorer-test.qday.info/tx/0x53d6ab8ba2956b2f4783eb91f3a473ddae6e570211f1241b9cafb369a4d4d478).
+   second use is refused: [request](https://explorer-test.qday.info/tx/0xbc59e9e91a28af68d13f54df8f601d3e7d145b2cf531175b7f7cb616d6439c1d), [allow once](https://explorer-test.qday.info/tx/0x74751062b75b5f50eb56db232c6ead0a0d10432d33441d9e5fe6114c5f45f4ee),
+   [paid](https://explorer-test.qday.info/tx/0x54b977ff608c9672aa8e23afa627434840a03eb725d02801b95f4237a6433f53), [reuse refused](https://explorer-test.qday.info/tx/0x8b16476ee73db18574e32c26ec06ec2b6ecb6b27708c26bb58e17d2750f85a81).
 4. **Money set aside for school.** The child is refused because the rest is set aside
-   ([refusal, reason 13](https://explorer-test.qday.info/tx/0xbef3e6ca81139bbf24a61b9b6771bbc26b41c760f7de9252b01ae88f942753ba)), and the school's charge is paid from it
-   ([charge paid](https://explorer-test.qday.info/tx/0x0e3fafaaf549be9a0c02d14219eaf14effe7c262debec9933600dd6c434dab8a)).
-5. **The AI guardian vetoes a duplicate on its own, and can't say yes.** [veto](https://explorer-test.qday.info/tx/0x75d440b5828080c9e59259f4d24aada22b3ba36737cd9ff3d95908fad3ad97ef)
+   ([refusal, reason 13](https://explorer-test.qday.info/tx/0x5be9b791fd89dfd3f6bb93a69653be75a403b996078d704e18abeb5f5a51f493)), and the school's charge is paid from it
+   ([charge paid](https://explorer-test.qday.info/tx/0xbb10fad058cc0cd3e689bcbfdbe75586d1ee003ae74960e76066d50ee0e02bea)).
+5. **The AI guardian vetoes a duplicate on its own, and can't say yes.** [veto](https://explorer-test.qday.info/tx/0xb03ae6ce47dac80e5619427ae7c67091db124d0591eb84b9371e824c7b0d0cfc)
    (an ERC-4337 user operation from the veto-only smart account); its attempt to approve is refused by the
    contract with `NotParent()`.
-6. **The parent overrides the veto.** [paid anyway](https://explorer-test.qday.info/tx/0x0458fde7b6213044e6a72c2ff309c8ae69518f6e3d76304300cd8d86adeebeb6): only the parent can do this.
-7. **One tap stops it.** [revoke billing](https://explorer-test.qday.info/tx/0x11d1fcce5610ad8f2254f6ad2c385c6f95f18d533c17fbd1afdeaa0cdb2a17fc) → [charge refused](https://explorer-test.qday.info/tx/0x1f0a78593fdd8aecbbab7c396dc280084496d10dac36c23023e563186d6d1fb0);
-   [pause](https://explorer-test.qday.info/tx/0x7e515ea60f9af2498a3c2352e2eb630292dde88ce3ae93166369f11abccbc4f1) → [payment refused](https://explorer-test.qday.info/tx/0xf4ce020c673b063d84d6dc9a17c39c8ae08904efb67e5ad500453506b4ce4c24).
-8. **Gas-free top-up.** The parent only signs an EIP-3009 authorisation; another account submits it:
-   [deposit](https://explorer-test.qday.info/tx/0x1a1a88424e7af1b3aea3f59169b7031139d7a8cdd15088fed3c934c678d85683).
+6. **The parent overrides the veto.** [paid anyway](https://explorer-test.qday.info/tx/0xe8c9fb21fcb0d65af6f48d5b0e6e6f6141feb7ea0c87b4d3fda118f3c553da09): only the parent can do this.
+7. **Silence isn't a yes (new in v3).** With "hold while the guardian is offline" on, a charge past its window is
+   [not paid](https://explorer-test.qday.info/tx/0xcd4630de8c3aded4fc13f339f25bea69c1d08f281302b9a4f31b319ff9a9357b) (`GuardianSilent`) until the guardian
+   [checks in](https://explorer-test.qday.info/tx/0x6f69db0a1bd983f96154b4a681e6fc959fe31ed766f9039b568cc27b971a62cd), then it's [paid](https://explorer-test.qday.info/tx/0xd5daec5bdea9a978b2c5a5953b697403635b0548525cab564680552427a93cfb).
+8. **One tap stops it.** [revoke billing](https://explorer-test.qday.info/tx/0x10ab183f9799607cad1e29830bc0b96e618b78193dedf99a8c1b9a2a6fed7b01) → [charge refused](https://explorer-test.qday.info/tx/0x2b21baae47eed6fa429b8576929b7e34c3e04048c5b8bcec5114bc5fd4964c3c);
+   [pause](https://explorer-test.qday.info/tx/0x71fa65a1cff1e454c8732d8857cd830ffd02b9012c8cfc5836e26740cf6f5086) → [payment refused](https://explorer-test.qday.info/tx/0x77b480001e948381e679c4265bfa20b0448f84f98eda620e1eb90673f2662f91).
+9. **Gas-free top-up.** The parent only signs an EIP-3009 authorisation; another account submits it:
+   [deposit](https://explorer-test.qday.info/tx/0xaeb24554ea561926d60bba2fdd1f3a4ebc5d98b4e9e8f6ddda136a5bfb14725c).
 
 Or open the [judge page](https://web-production-b9d9f11e.up.railway.app/judge) and send a trick note or a
 duplicate charge yourself: the hosted guardian vetoes it within about 30 seconds.
