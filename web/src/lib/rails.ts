@@ -202,19 +202,22 @@ export function useHistory(vaultId?: bigint) {
 
 /** Payee labels the parent gave, from PayeeChanged events (latest wins). */
 export function payeeLabels(history: HistoryEvent[] | undefined): Map<string, string> {
-  const m = new Map<string, string>();
+  // A place's own name (from the approved places) wins over a billing permission's name for the same account,
+  // so the school's account reads the same everywhere ("School canteen", not sometimes "Meal plan").
+  const places = new Map<string, string>();
+  const billing = new Map<string, string>();
   for (const e of [...(history ?? [])].reverse()) {
-    if (e.eventName === "PayeeChanged" && e.args.label) m.set(String(e.args.payee).toLowerCase(), String(e.args.label));
+    if (e.eventName === "PayeeChanged" && e.args.label) places.set(String(e.args.payee).toLowerCase(), String(e.args.label));
     if (e.eventName === "BillingGranted") {
       try {
         const t = JSON.parse(String(e.args.terms)) as { payTo?: string };
-        if (t.payTo && e.args.label) m.set(t.payTo.toLowerCase(), String(e.args.label));
+        if (t.payTo && e.args.label) billing.set(t.payTo.toLowerCase(), String(e.args.label));
       } catch {
         /* terms not JSON: ignore */
       }
     }
   }
-  return m;
+  return new Map([...billing, ...places]);
 }
 
 // ------------------------------------------------------------------ writes (parent, school, guardian pay their own gas)

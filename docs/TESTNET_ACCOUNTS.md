@@ -13,5 +13,9 @@ this repository.
 | Guardian smart account | [`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0) | Kernel v3.1 account owned by Guardian; guards allowance #1 on v2; pays its own gas | Yes (has 0.0097) | No |
 | Guardian session key | `0xE0078d6bE769bEe23Ad5D4eAcE941A2053a61F97` | The guardian agent's key: can only make the smart account call `vetoCharge` (30 days) | No | No |
 
-Gas on Aevum is about 1 gwei, so deploying PocketRails costs roughly 0.005 tQDAY. One faucet claim
-(5 tQDAY) covers each account for the whole challenge.
+Gas on Aevum is about 1 gwei, so deploying PocketRails costs roughly 0.005 tQDAY. One Discord faucet claim
+(1 tQDAY + 5 tUSD8) covers an account's gas for the whole challenge.
+
+The Child above is the showcase child of allowance #1. The evidence run ([EVIDENCE.md](EVIDENCE.md)) opens its own
+allowance (#2) with a **fresh child key each run**, to show that a child who has never held any gas can pay; its
+address is listed in that document.

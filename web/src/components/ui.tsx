@@ -2,7 +2,7 @@
 
 import { txUrl } from "@aevum-kit/aevum";
 import { explainReason, type Outcome } from "@pocket-rails/sdk";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Hash } from "viem";
 import { useNetwork } from "@/lib/network";
 import { short, type HistoryEvent } from "@/lib/rails";
@@ -144,6 +144,63 @@ const TONE: Record<string, string> = {
   VaultRevoked: "bad",
 };
 
+type Line = { kind: "event"; e: HistoryEvent } | { kind: "failed"; events: HistoryEvent[]; ids: string[] };
+
+/**
+ * Groups runs of school charges that couldn't be paid (each a "requested" + "failed" pair) into one line, so a
+ * stretch when the allowance was empty doesn't drown out everything else. Nothing is dropped: the line expands.
+ */
+function groupFailed(events: HistoryEvent[]): Line[] {
+  const failed = new Set(events.filter((e) => e.eventName === "ChargeFailed").map((e) => String(e.args.chargeId)));
+  const isFailedCharge = (e: HistoryEvent) => (e.eventName === "ChargeRequested" || e.eventName === "ChargeFailed") && failed.has(String(e.args.chargeId));
+  const out: Line[] = [];
+  let run: HistoryEvent[] = [];
+  const flush = () => {
+    const ids = [...new Set(run.map((e) => String(e.args.chargeId)))];
+    if (ids.length >= 3) out.push({ kind: "failed", events: run, ids });
+    else run.forEach((e) => out.push({ kind: "event", e }));
+    run = [];
+  };
+  for (const e of events) {
+    if (isFailedCharge(e)) run.push(e);
+    else {
+      flush();
+      out.push({ kind: "event", e });
+    }
+  }
+  flush();
+  return out;
+}
+
+function FailedRun({ line, label, money }: { line: Extract<Line, { kind: "failed" }>; label: (a: string) => string; money: (x: unknown) => string }) {
+  const [open, setOpen] = useState(false);
+  const nums = line.ids.map(Number).sort((a, b) => a - b);
+  const reason = line.events.find((e) => e.eventName === "ChargeFailed");
+  return (
+    <li className="warn">
+      <span className="tl-text">
+        {line.ids.length} school charges couldn&apos;t be paid{reason ? `: ${Number(reason.args.reason) === 6 ? "the allowance didn't have enough money at the time" : explainReason(Number(reason.args.reason)).message.replace(/\.$/, "").toLowerCase()}` : ""} (#{nums[0]}–#{nums[nums.length - 1]}).
+        No money moved.{" "}
+        <button type="button" className="btn small ghost" onClick={() => setOpen((x) => !x)}>
+          {open ? "Hide them" : "Show them"}
+        </button>
+      </span>
+      {open && (
+        <ol className="timeline" style={{ marginTop: 6 }}>
+          {line.events.map((e) => (
+            <li key={`${e.txHash}-${e.logIndex}`} className={TONE[e.eventName] ?? ""}>
+              <span className="tl-text">{EVENT_TEXT[e.eventName]?.(e.args, label, money) ?? e.eventName}</span>
+              <span className="tl-meta">
+                block {e.blockNumber} · <TxLink hash={e.txHash} />
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </li>
+  );
+}
+
 /** The on-chain history of a vault, newest first, each line linked to its transaction. */
 export function Timeline({
   events,
@@ -163,14 +220,18 @@ export function Timeline({
   if (!events?.length) return <p className="empty">Nothing yet.</p>;
   return (
     <ol className="timeline">
-      {events.map((e) => (
-        <li key={`${e.txHash}-${e.logIndex}`} className={TONE[e.eventName] ?? ""}>
-          <span className="tl-text">{EVENT_TEXT[e.eventName]?.(e.args, label, money) ?? e.eventName}</span>
-          <span className="tl-meta">
-            block {e.blockNumber} · <TxLink hash={e.txHash} />
-          </span>
-        </li>
-      ))}
+      {groupFailed(events).map((l) =>
+        l.kind === "failed" ? (
+          <FailedRun key={`failed-${l.ids[0]}`} line={l} label={label} money={money} />
+        ) : (
+          <li key={`${l.e.txHash}-${l.e.logIndex}`} className={TONE[l.e.eventName] ?? ""}>
+            <span className="tl-text">{EVENT_TEXT[l.e.eventName]?.(l.e.args, label, money) ?? l.e.eventName}</span>
+            <span className="tl-meta">
+              block {l.e.blockNumber} · <TxLink hash={l.e.txHash} />
+            </span>
+          </li>
+        ),
+      )}
     </ol>
   );
 }

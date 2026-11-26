@@ -139,7 +139,7 @@ the [Safety model](#safety-model).
 
 | Part | State |
 |---|---|
-| `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 67 unit and fuzz tests, 4 invariants (128,000 random calls), 2 fork tests on the real tUSD8 |
+| `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 67 unit and fuzz tests, plus an invariant suite that checks 4 properties over 128,000 random calls (forge reports the suite as 1 test, hence 76 in total), and 2 fork tests on the real tUSD8 |
 | TypeScript SDK (`packages/pocket-rails`): ABI, EIP-712 intents, reason codes, outcome decoding | Done |
 | Relayer for child intents (`/api/rails/relay`) and outcome lookup (`/api/rails/tx`) | Done, tested end to end on a local chain (`pnpm example demo-flow`) |
 | Deployment to Aevum testnet | v2 (adds money set aside for school) done and **source verified**: `0xB179197A660029b1d96FEF09e3E8515b271E3801`. v1, with the first live runs: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
@@ -489,8 +489,9 @@ If another program called `forge` comes first on your PATH, pass Foundry's: `mak
 
 1. Create two fresh TEST wallets: a deployer/parent and a relayer (`cast wallet new`). Never reuse a wallet
    that holds anything of value.
-2. Fund both with tQDAY, and the parent with tUSD8, from [faucet.qday.info](https://faucet.qday.info/en)
-   (or `/faucet` in the QDay Discord).
+2. Fund both with tQDAY, and the parent with tUSD8, from `/faucet` in the QDay Discord (1 tQDAY + 5 tUSD8
+   per Discord account). The web faucet ([faucet.qday.info](https://faucet.qday.info/en)) refused new test
+   wallets during the challenge (see [platform feedback](docs/PLATFORM_FEEDBACK.md)).
 3. Deploy (the keystore keeps the deployer key encrypted):
 
 ```bash
@@ -601,7 +602,6 @@ Aevum has no WebSocket RPC, so clients poll it.
 - Parent and child as Kernel smart accounts too (the guardian already is), with recovery for the parent.
 - Payee identities through QDay's ERC-8004 registry once it's open.
 - "Hold all school charges while the guardian is offline" setting.
-- Earmarked funds (school fees the child's spending can't touch).
 - Fiat on- and off-ramps for cross-border family funding (not built today).
 
 ## Platform feedback

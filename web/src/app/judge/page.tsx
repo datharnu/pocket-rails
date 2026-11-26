@@ -65,6 +65,7 @@ export default function JudgePage() {
   const billing = billings.items.find((b) => b.id === billingId)?.data;
   // Charges that failed (e.g. sent while the allowance was empty) are left out; they stay in the parent's History.
   const list = charges.items.filter((c) => c.data.billingId === billingId && c.data.status !== 5).slice(0, 12);
+  const failedCount = charges.items.filter((c) => c.data.billingId === billingId && c.data.status === 5).length;
   const serverNote = useServerNotes(list.map((c) => c.data.memoHash));
   const simulated = new Map((info.data?.simulated ?? []).map((s) => [s.chargeId, s.kind]));
 
@@ -246,6 +247,13 @@ export default function JudgePage() {
       <section className="card">
         <h2>Latest charges on this allowance</h2>
         <p className="sub">Updates every few seconds, straight from the contract.</p>
+        {failedCount > 0 && (
+          <p className="fine" style={{ marginBottom: 8 }}>
+            Not listed: {failedCount} earlier charge{failedCount > 1 ? "s" : ""} that couldn&apos;t be paid because this allowance ran out of money
+            while we were setting it up (no money moved). A bug made the school agent keep retrying; it&apos;s fixed, and the agent no longer bills an
+            empty allowance. They&apos;re all in the parent&apos;s <a href="/parent#history">History</a>.
+          </p>
+        )}
         <div className="list">
           {list.map(({ id, data: c }) => {
             const ev = events.get(id.toString());

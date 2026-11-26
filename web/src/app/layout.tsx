@@ -11,6 +11,7 @@ const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], v
 
 export const metadata: Metadata = {
   title: { default: "Pocket Rails", template: "%s · Pocket Rails" },
+  icons: { icon: "/logo-mark.svg" },
   description: "Parents set the rules once. Kids pay inside them. Schools bill with a veto window. Stablecoin family payments on QDay Aevum testnet.",
 };
 

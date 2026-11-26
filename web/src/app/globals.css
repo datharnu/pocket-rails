@@ -74,7 +74,7 @@ main.shell { padding-top: 36px; padding-bottom: 72px; display: flex; flex-direct
 @media (max-width: 720px) { .topbar .shell { flex-wrap: wrap; } }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
 .brand:hover { color: var(--ink); }
-.brand-mark { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-size: 19px; background: linear-gradient(135deg, var(--coral), var(--sun)); }
+.brand-mark { width: 34px; height: 34px; border-radius: 9px; display: block; }
 .brand-name { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.01em; }
 .nav { display: flex; gap: 6px; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; }
 .nav::-webkit-scrollbar { display: none; }
@@ -453,3 +453,10 @@ main.home { gap: 64px; }
 details[open] > summary.btn { margin-bottom: 4px; }
 .lbl { line-height: 22px; }
 .phone .form > .btn.ghost { align-self: center; }
+@media (max-width: 520px) { .nav { gap: 2px; } .nav a { padding: 7px 9px; gap: 4px; font-size: 14px; } }
+/* phones: the five sections as a tab bar (icon above label), so none is cut off */
+@media (max-width: 520px) {
+  .nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; padding-right: 0; -webkit-mask-image: none; mask-image: none; }
+  .nav a { flex-direction: column; justify-content: center; gap: 1px; padding: 6px 2px; font-size: 11.5px; border-radius: 12px; }
+  .nav a > span[aria-hidden] { font-size: 18px; line-height: 1.1; }
+}

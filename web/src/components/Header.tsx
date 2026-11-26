@@ -27,9 +27,8 @@ export function Header() {
       <header className="topbar">
         <div className="shell">
           <Link href="/" className="brand">
-            <span className="brand-mark" aria-hidden="true">
-              🛤️
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="brand-mark" src="/logo-mark.svg" alt="" width={34} height={34} />
             <span className="brand-name">Pocket Rails</span>
           </Link>
           <nav className="nav" aria-label="Main">

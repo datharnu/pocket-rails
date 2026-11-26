@@ -68,6 +68,12 @@ vetoes came from the hosted agent reviewing real school charges, including the o
 | #2, #4, #9 | The same lunch twice | Rule check: “Duplicate of charge #1 (same note, already charged)” | [`0x3f6322ba…`](https://explorer-test.qday.info/tx/0x3f6322ba62ccfdf7ea6f06bb2dbd51495d7b69153a59d0b28e9093ab943ca5a5), [`0x96509e89…`](https://explorer-test.qday.info/tx/0x96509e8900eb776b10d2c56a88bd1d9223a43377695f3a00620c514c41262117), [`0x5e9cbc3a…`](https://explorer-test.qday.info/tx/0x5e9cbc3a94f0bf5f53f2fa91b42bb9ed1c47881a14954558ff56f3bd41e34352) |
 | — | A charge above the parent's per-charge limit | Refused by the contract itself, recorded with reason 9 | [`0x190b39f3…`](https://explorer-test.qday.info/tx/0x190b39f35c1907a4014d296804eb8fe1aeac61b7e55e51b448a77d2a01f11e59) |
 
+**About the failed charges in this allowance's history.** On 25 Nov the showcase allowance ran out of money while
+we were setting up hosting. A bug in the school agent then re-sent the day's lunch after every failure, so the
+history has a run of charges (#5–#35) that couldn't be paid, each with reason 6 (not enough balance). No money
+moved. The agent now makes one attempt per lunch and doesn't bill an empty allowance (commit `5d68da9`); the app's
+History groups that run into one line you can expand.
+
 Every veto is an ERC-4337 user operation sent through QDay's bundler and signed by the veto-only session key. How
 the smart account was set up, step by step: [DEMO_RUN.md](DEMO_RUN.md#smart-account-guardian-run-on-v2-2026-11-25).
 

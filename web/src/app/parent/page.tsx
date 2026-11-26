@@ -515,6 +515,8 @@ function StoppedCharges({
     if (e.eventName === "ChargeVetoed" && !vetoes.has(String(e.args.chargeId))) vetoes.set(String(e.args.chargeId), { by: String(e.args.by), reason: String(e.args.reason ?? "") });
   }
   if (stopped.length === 0 && status.state === "idle") return null;
+  // Wait for the history, so each charge shows who stopped it and the place's name (not a raw address).
+  if (history === undefined) return <p className="empty">Loading stopped charges…</p>;
 
   return (
     <section id="stopped" className="card" aria-label="Stopped charges">
