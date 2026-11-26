@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view"><img alt="Demo video" src="https://img.shields.io/badge/demo%20video-2%3A52-FF6B4A?style=flat-square"></a>
   <a href="https://web-production-b9d9f11e.up.railway.app"><img alt="Live app" src="https://img.shields.io/badge/live%20app-online-22A06B?style=flat-square"></a>
   <a href="https://web-production-b9d9f11e.up.railway.app/judge"><img alt="For judges" src="https://img.shields.io/badge/for%20judges-no%20wallet%20needed-C93D25?style=flat-square"></a>
   <a href="docs/EVIDENCE.md"><img alt="Evidence" src="https://img.shields.io/badge/evidence-29%2F29%20live%20checks-1F6FB8?style=flat-square"></a>
@@ -21,6 +22,7 @@
 </p>
 
 <p align="center">
+  <a href="https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view"><b>Demo video</b></a> ·
   <a href="https://web-production-b9d9f11e.up.railway.app"><b>Live app</b></a> ·
   <a href="https://web-production-b9d9f11e.up.railway.app/judge"><b>For judges</b></a> ·
   <a href="docs/EVIDENCE.md"><b>Evidence</b></a> ·
@@ -28,7 +30,10 @@
   <a href="docs/PITCH.md"><b>Pitch</b></a>
 </p>
 
-<!-- VIDEO -->
+<p align="center">
+  <a href="https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view"><img src="docs/brand/demo-cover.png" alt="Watch the Pocket Rails demo (2:52)" width="760"></a><br>
+  <sub>▶ <a href="https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view">Watch the demo (2:52)</a>: recorded live on QDay Aevum testnet with test tokens</sub>
+</p>
 
 A parent wants to give a child spending money without approving every payment or handing over a card with no
 limits. The child's school also needs to collect money for meals and trips from that same allowance. Pocket
@@ -39,6 +44,7 @@ is not audited.
 
 | Try it | |
 |---|---|
+| **Demo video** | **[Watch it (2:52)](https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view)**: a child pays and is refused, the school bills, and the AI guardian stops a trick charge, all live on Aevum |
 | **Live app** | **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)**, with the school billing agent and the guardian smart account running 24/7 on Railway |
 | **Contract** | v2 [`0xB179…3801` on the Aevum explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) (source verified); v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) holds the first live runs |
 | **Evidence** | [docs/EVIDENCE.md](docs/EVIDENCE.md): every v2 feature run live through the hosted app and AI guardian, 29/29 checks, each with its transaction |
