@@ -70,7 +70,7 @@ wallet. Connect one to act.
 1. **The school pulls charges under a veto window.** The parent grants the school a capped, expiring billing
    permission. Each charge waits as Pending for at least one minute, the parent or the guardian can veto it
    in that time, and after the window anyone can settle it.
-   Code: [`requestCharge`](contracts/src/PocketRails.sol#L585), [`vetoCharge`](contracts/src/PocketRails.sol#L624), [`settle`](contracts/src/PocketRails.sol#L662).
+   Code: [`requestCharge`](contracts/src/PocketRails.sol#L630), [`vetoCharge`](contracts/src/PocketRails.sol#L669), [`settle`](contracts/src/PocketRails.sol#L709).
    The parent can also set money aside for school charges that the child's spending can't touch
    ([money set aside for school](#money-set-aside-for-school-v2)).
    Tests: [`test_charge_settlesAfterVetoWindow`](contracts/test/PocketRailsBilling.t.sol#L47), [`test_vetoOnlyInsideWindow`](contracts/test/PocketRailsBilling.t.sol#L128),
@@ -80,7 +80,7 @@ wallet. Connect one to act.
    treats charge notes as untrusted data and answers "unknown" when unsure, which leaves the charge for the
    parent.
    The guardian runs as a Kernel v3.1 smart account: its agent holds a session key that our validator module
-   only lets call `vetoCharge`, sent as ERC-4337 user operations through QDay's bundler
+   only lets call `vetoCharge` (and `guardianCheckIn`, for the offline hold), sent as ERC-4337 user operations through QDay's bundler
    ([details](#guardian-smart-account-and-veto-only-session-key)).
    Code: [`agents/`](agents/), [`agents/src/review.ts`](agents/src/review.ts), [`VetoOnlySessionValidator.sol`](contracts/src/VetoOnlySessionValidator.sol).
    Measured on 50 frozen test notes ([docs/AI_EVAL.md](docs/AI_EVAL.md)): rules + AI vetoed 30 of 30 bad charges,
