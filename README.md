@@ -125,6 +125,11 @@ duplicate charge yourself: the hosted guardian vetoes it within about 30 seconds
 
 ## Shared building blocks
 
+Two pieces are packaged for other builders: the **SDK** ([`packages/pocket-rails`](packages/pocket-rails/README.md):
+EIP-712 intents, reason codes with plain-language messages, outcome decoding; builds to plain Node ESM) and the
+**"can only say no" session key** for Kernel smart accounts ([docs/VETO_ONLY_SESSION_KEY.md](docs/VETO_ONLY_SESSION_KEY.md):
+an ERC-7579 validator that limits an agent's key to one function on one contract).
+
 The child side uses familiar spending controls: [approved places, a per-payment limit, a weekly limit and an
 expiry date](#child-pays-push), [one-time exceptions](#one-time-exceptions), [instant revocation](#what-revoking-does-to-things-already-in-flight)
 and [gasless signed intents submitted by a relayer](#relayer-api). The full list of threats and controls is in

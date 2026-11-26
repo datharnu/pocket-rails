@@ -1,15 +1,44 @@
 {
   "name": "@pocket-rails/sdk",
   "version": "0.1.0",
-  "private": true,
+  "description": "TypeScript SDK for PocketRails on QDay Aevum: contract ABI, EIP-712 payment and exception intents, reason codes with plain-language messages, and receipt decoding.",
   "license": "MIT",
   "type": "module",
-  "description": "TypeScript SDK for PocketRails: ABI, EIP-712 intents, reason codes and plain-language messages.",
+  "keywords": [
+    "qday",
+    "aevum",
+    "stablecoin",
+    "allowance",
+    "eip-712",
+    "viem",
+    "pocket-rails"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/datharnu/pocket-rails.git",
+    "directory": "packages/pocket-rails"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && node fix-esm.mjs",
+    "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
     "viem": "^2.57.0"

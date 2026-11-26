@@ -21,3 +21,4 @@ web/.cache/
 /tools/video/.env
 /tools/video/out/
 /tools/video/node_modules/
+/packages/pocket-rails/dist/
