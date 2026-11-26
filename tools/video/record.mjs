@@ -193,8 +193,8 @@ async function scrollTo(locator, block = "center") {
 async function waiting(fn) {
   const t = now();
   const r = await fn();
-  const from = Math.max(t + 0.4, voiceUntil);
-  const to = now() - 0.7;
+  const from = Math.max(t + 0.2, voiceUntil);
+  const to = now() - 0.5;
   if (to - from > 1.2) {
     cuts.push([from, to]);
     log(`cut ${(to - from).toFixed(1)}s of waiting`);
@@ -295,19 +295,26 @@ let refusalUrl;
     await click(page.getByRole("button", { name: /^Pay/ }));
     await waiting(() => page.getByText(/didn.t go through/).waitFor({ timeout: 90000 }));
     await point(page.getByText(/didn.t go through/), 700);
-    await sleep(1200);
+    await sleep(600);
     refusalUrl = await page.getByRole("link", { name: /See the record/ }).first().getAttribute("href");
-    await point(page.getByRole("link", { name: /See the record/ }), 700);
-    await sleep(500);
+    await point(page.getByRole("link", { name: /See the record/ }), 600);
+    await v2;
     await waiting(async () => {
       await go(`${refusalUrl}?tab=logs`);
       await page.getByText(/Refused/).first().waitFor({ timeout: 30000 }).catch(() => log("explorer: no decoded log text"));
+      await sleep(800);
     });
-    await sleep(800);
-    await point(page.getByText(/Refused/).first(), 900);
-    await sleep(6000); // hold on the hash and reason code
-  } else await sleep(9000);
-  await v2;
+    const hold = Date.now();
+    const vx = say("s3x");
+    await point(page.getByText(/Refused/).first(), 800);
+    await sleep(2400);
+    await point(page.getByText(/^reason$/).first(), 800);
+    await vx;
+    await sleep(Math.max(0, 6000 - (Date.now() - hold))); // at least 6 s on the hash and reason code
+  } else {
+    await v2;
+    await say("s3x");
+  }
 
   await waiting(async () => {
     await go("/child");
@@ -322,7 +329,8 @@ let refusalUrl;
   if (!DRY) {
     await click(page.getByRole("button", { name: /^Pay/ }));
     await waiting(() => page.locator(".notice.good").waitFor({ timeout: 90000 }));
-    await point(page.locator(".notice.good"), 800);
+    await point(page.locator(".notice.good"), 500);
+    await sleep(400);
   }
   await v3;
 }
@@ -372,11 +380,15 @@ let refusalUrl;
     await waiting(() => page.getByText(/Vetoed by the guardian smart account/).waitFor({ timeout: 150000 }));
     await caption("");
     await v1;
+    const v2 = say("s5b");
     const vetoed = page.getByText(/Vetoed by the guardian smart account/);
     await scrollTo(vetoed);
     await point(vetoed, 700);
-  } else await v1;
-  await say("s5b");
+    await v2;
+  } else {
+    await v1;
+    await say("s5b");
+  }
 }
 
 // Scene 6: proof and control
@@ -387,27 +399,27 @@ let refusalUrl;
     await go("/guardian#decisions");
     await row.waitFor({ timeout: 20000 });
   });
-  const v1 = say("s6a");
   await scrollTo(row);
-  await point(row.locator("td").nth(2), 800);
-  await sleep(900);
-  await point(row.locator(".why").first(), 700);
-  await sleep(700);
+  const v1 = say("s6a");
+  await point(row.locator("td").nth(2), 700);
+  await sleep(400);
+  await point(row.locator(".why").first(), 600);
   const vetoLink = row.getByRole("link", { name: /See the veto/ });
   const href = await vetoLink.getAttribute("href");
-  await point(vetoLink, 600);
-  await sleep(400);
+  await point(vetoLink, 500);
+  await v1;
   await waiting(async () => {
     await go(href);
     await page.getByText(/^Success$/).first().waitFor({ timeout: 40000 }).catch(() => log("explorer: status not shown"));
-    await sleep(1200);
+    await sleep(800);
   });
-  await sleep(1000);
-  await point(page.getByText(/^Transaction hash$/).first(), 900);
-  await sleep(3000); // hold on the transaction hash
-  await point(page.getByText(/^handleOps$/).first(), 700);
-  await sleep(3000); // a user operation from the guardian smart account
-  await v1;
+  const hold = Date.now();
+  const vx = say("s6x");
+  await point(page.getByText(/^Transaction hash$/).first(), 800);
+  await sleep(2600); // the transaction hash
+  await point(page.getByText(/^handleOps$/).first(), 700); // a user operation from the guardian smart account
+  await vx;
+  await sleep(Math.max(0, 6000 - (Date.now() - hold)));
 
   const stopped = page.getByText(/Stopped charges/).first();
   await waiting(async () => {

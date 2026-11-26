@@ -18,7 +18,11 @@ export const parts = [
   },
   {
     id: "s3b",
-    text: "And even if she sends it anyway, a refused payment still leaves a record. It moves no money, and it has a transaction on the explorer with a reason code.",
+    text: "And even if she sends it anyway, it's refused, and the refusal still leaves a record. No money moves.",
+  },
+  {
+    id: "s3x",
+    text: "Here's that refusal on the Aevum explorer: a real transaction, with reason code four, over the per-payment limit.",
   },
   {
     id: "s3c",
@@ -38,7 +42,11 @@ export const parts = [
   },
   {
     id: "s6a",
-    text: "Every decision is public. Here's the guardian's reason, and the transaction on the Aevum explorer.",
+    text: "Every decision is public. Here's the guardian's reason.",
+  },
+  {
+    id: "s6x",
+    text: "And here's the veto on the Aevum explorer. It's a user operation from the guardian's smart account, whose key can only call veto.",
   },
   {
     id: "s6b",

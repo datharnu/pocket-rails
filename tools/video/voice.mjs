@@ -33,8 +33,13 @@ if (!voiceId) {
   console.log(`Using ${ranked[0].v.name} (${voiceId})`);
 }
 
-const durations = {};
-for (const p of parts) {
+const only = process.env.ONLY?.split(",").map((x) => x.trim()).filter(Boolean);
+let durations = {};
+try {
+  const prev = JSON.parse(await (await import("node:fs/promises")).readFile(path.join(out, "durations.json"), "utf8"));
+  if (prev.voiceId === voiceId) durations = prev.durations;
+} catch {}
+for (const p of parts.filter((x) => !only || only.includes(x.id))) {
   const res = await api(`/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "audio/mpeg" },
@@ -51,5 +56,5 @@ for (const p of parts) {
   console.log(`${p.id}  ${durations[p.id].toFixed(1)}s`);
 }
 await writeFile(path.join(out, "durations.json"), JSON.stringify({ voiceId, durations }, null, 2));
-const total = Object.values(durations).reduce((a, b) => a + b, 0);
+const total = parts.reduce((a, p) => a + (durations[p.id] ?? 0), 0);
 console.log(`Total narration: ${total.toFixed(1)}s`);
