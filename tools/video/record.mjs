@@ -8,6 +8,7 @@
 import { readFile, mkdir, writeFile, rm, readdir, rename } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { createPublicClient, createWalletClient, defineChain, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 const SITE = process.env.SITE ?? "https://web-production-b9d9f11e.up.railway.app";
@@ -26,6 +27,10 @@ const keyOf = (name) => {
 };
 const accounts = { parent: privateKeyToAccount(keyOf("PARENT_KEY")), child: privateKeyToAccount(keyOf("CHILD_KEY")) };
 let who = "parent"; // whose address the test wallet answers with ("none" = disconnected)
+const aevum = defineChain({ id: 44005, name: "QDay Aevum Testnet", nativeCurrency: { name: "tQDAY", symbol: "tQDAY", decimals: 18 }, rpcUrls: { default: { http: [RPC] } } });
+const parentWallet = createWalletClient({ account: accounts.parent, chain: aevum, transport: http(RPC) });
+const publicClient = createPublicClient({ chain: aevum, transport: http(RPC) });
+const sent = []; // the parent's transactions during the take (logged in marks.json)
 
 // ---------------------------------------------------------------------------------------------- browser
 await rm(path.join(out, "raw"), { recursive: true, force: true });
@@ -69,9 +74,23 @@ await context.exposeBinding("__testWallet", async (_src, method, params) => {
       if (DRY) throw new Error("DRY run: not signing");
       return me.signTypedData(toTyped(params[1]));
     }
-    case "eth_sendTransaction":
+    case "eth_sendTransaction": {
+      // Only the parent sends transactions in the video ("Allow once", "Pause spending"); the child only signs.
+      if (who !== "parent" || DRY) throw new Error("The video wallet only sends the parent's transactions, and not in a DRY run.");
+      const tx = params[0];
+      const hash = await parentWallet.sendTransaction({
+        to: tx.to,
+        data: tx.data,
+        value: tx.value ? BigInt(tx.value) : 0n,
+        gas: tx.gas ? BigInt(tx.gas) : undefined,
+        gasPrice: tx.gasPrice ? BigInt(tx.gasPrice) : undefined,
+        type: "legacy",
+      });
+      sent.push(hash);
+      return hash;
+    }
     case "eth_sendRawTransaction":
-      throw new Error("The video wallet doesn't send transactions.");
+      throw new Error("The video wallet doesn't send raw transactions.");
     default: {
       const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
       const j = await r.json();
@@ -333,6 +352,41 @@ let refusalUrl;
     await sleep(400);
   }
   await v3;
+
+  // The one-time exception: the child asks, the parent allows it once, the child pays it.
+  if (!DRY) {
+    const vd = say("s3d");
+    await click(page.getByRole("button", { name: /Ask your parent/ }));
+    await typeSlow(page.locator(".amount-input"), "0.6");
+    await typeSlow(page.locator("input.field.text").last(), "Class party snacks");
+    await click(page.getByRole("button", { name: /Send request to parent/ }));
+    await waiting(() => page.getByText(/Waiting for your parent/).first().waitFor({ timeout: 90000 }));
+    await point(page.getByText(/Waiting for your parent/).first(), 500);
+    await vd;
+
+    await waiting(async () => {
+      await switchTo("parent");
+      await go("/parent");
+      await page.locator("#requests").waitFor({ timeout: 30000 });
+    });
+    const ve = say("s3e");
+    await scrollTo(page.locator("#requests"));
+    await click(page.locator("#requests").getByRole("button", { name: /Allow once/ }).first());
+    await waiting(() => page.locator("#requests .notice.good").waitFor({ timeout: 90000 }));
+    await point(page.locator("#requests .notice.good"), 500);
+    await ve;
+
+    await waiting(async () => {
+      await switchTo("child");
+      await go("/child");
+      await page.getByRole("button", { name: /Pay now/ }).first().waitFor({ timeout: 30000 });
+    });
+    const vf = say("s3f");
+    await click(page.getByRole("button", { name: /Pay now/ }).first());
+    await waiting(() => page.locator(".notice.good").waitFor({ timeout: 90000 }));
+    await point(page.locator(".notice.good"), 500);
+    await vf;
+  }
 }
 
 // Scene 4: school billing
@@ -430,9 +484,14 @@ let refusalUrl;
   const v2 = say("s6b");
   await scrollTo(stopped, "start");
   await point(page.getByRole("button", { name: /Pay it anyway/ }), 900);
-  await sleep(4200);
+  await sleep(2600);
   await click(page.getByRole("button", { name: /Pause & stop/ }));
-  await point(page.getByRole("button", { name: /Pause spending/ }), 900);
+  if (!DRY) {
+    await click(page.getByRole("button", { name: /Pause spending/ }));
+    await waiting(() => page.getByText(/Child paused/).first().waitFor({ timeout: 90000 }));
+    await point(page.getByText(/Child paused/).first(), 600);
+    await sleep(600);
+  } else await point(page.getByRole("button", { name: /Pause spending/ }), 900);
   await v2;
 }
 
@@ -460,8 +519,19 @@ log("done");
 
 await page.close();
 await context.close();
+if (!DRY) {
+  // Put the showcase back: the video paused the child, so turn spending back on (off camera).
+  const rails = "0xB179197A660029b1d96FEF09e3E8515b271E3801";
+  const abi = parseAbi(["function getVault(uint256) view returns ((address parent,address child,address guardian,bool childActive,uint64 childEpoch,uint64 billingEpoch,uint64 version,uint64 week,uint256 weekSpent,uint256 balance,uint256 schoolReserve,(uint128 perPaymentLimit,uint128 weeklyLimit,uint64 expiresAt) rules))", "function setChild(uint256 vaultId, address child)"]);
+  const v = await publicClient.readContract({ address: rails, abi, functionName: "getVault", args: [1n] });
+  if (!v.childActive) {
+    const h = await parentWallet.writeContract({ address: rails, abi, functionName: "setChild", args: [1n, v.child], type: "legacy" });
+    await publicClient.waitForTransactionReceipt({ hash: h });
+    log(`restored: child spending back on (${h})`);
+  }
+}
 await browser.close();
 const files = (await readdir(path.join(out, "raw"))).filter((f) => f.endsWith(".webm"));
 await rename(path.join(out, "raw", files[0]), path.join(out, "raw/take.webm"));
-await writeFile(path.join(out, "marks.json"), JSON.stringify({ dry: DRY, marks, cuts, refusalUrl }, null, 2));
+await writeFile(path.join(out, "marks.json"), JSON.stringify({ dry: DRY, marks, cuts, refusalUrl, parentTransactions: sent }, null, 2));
 console.log(`Video: out/raw/take.webm, marks: out/marks.json (${(marks.end - marks.start).toFixed(1)}s from scene 1 to the end)`);
