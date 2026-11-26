@@ -521,7 +521,7 @@ await page.close();
 await context.close();
 if (!DRY) {
   // Put the showcase back: the video paused the child, so turn spending back on (off camera).
-  const rails = "0xB179197A660029b1d96FEF09e3E8515b271E3801";
+  const rails = "0xa37f27487562a1595768A681Ee21D3e93FFcE05c";
   const abi = parseAbi(["function getVault(uint256) view returns ((address parent,address child,address guardian,bool childActive,uint64 childEpoch,uint64 billingEpoch,uint64 version,uint64 week,uint256 weekSpent,uint256 balance,uint256 schoolReserve,(uint128 perPaymentLimit,uint128 weeklyLimit,uint64 expiresAt) rules))", "function setChild(uint256 vaultId, address child)"]);
   const v = await publicClient.readContract({ address: rails, abi, functionName: "getVault", args: [1n] });
   if (!v.childActive) {

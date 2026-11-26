@@ -22,11 +22,11 @@ plan ($5/month) keeps it running. AI reviews use your Anthropic API key (a few d
 
 ## Before you start: fund the showcase
 
-The hosted agents use allowance #1 on PocketRails v2, guarded by the smart account. Do these once, in MetaMask or the app:
+The hosted agents use allowance #1 on PocketRails v3, guarded by the smart account. Do these once, in MetaMask or the app:
 
 1. **School → Parent:** send the tUSD8 the School account holds back to Parent.
 2. **Top up allowance #1:** as Parent, on the Parent page → 💵 Money → top up **1.5 tUSD8** (about 14 school lunches at 0.1).
-3. **Gas:** from Parent, send **0.1 tQDAY** to the guardian smart account (`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`) and
+3. **Gas:** from Parent, send **0.1 tQDAY** to the guardian smart account (`0x3FE5AE286D3653aa983fE20633cFd9CaB7220382`) and
    **0.1 tQDAY** to School (`0x8C6a84C3B1463EB302214D8356280aE218e0368F`). Judge demos cost a little gas each.
 
 ## Step 1: create the Railway project

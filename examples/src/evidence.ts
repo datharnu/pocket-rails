@@ -1,12 +1,12 @@
 /**
- * Evidence run for PocketRails v2: every feature, live on Aevum, through the HOSTED system.
+ * Evidence run for PocketRails v3: every feature, live on Aevum, through the HOSTED system.
  *
  *   - the child's payments go through the hosted relayer (APP_URL), the child never pays gas;
  *   - school charges are reviewed by the hosted guardian agent (the veto-only smart account, GUARDIAN_ACCOUNT),
  *     which vetoes on its own; this script only waits and reads the result.
  *
  * It opens a fresh evidence allowance (so the showcase allowance is untouched), runs the scenarios, then the
- * parent withdraws what's left. Every step is checked against the chain and written to docs/evidence/v2-run.json.
+ * parent withdraws what's left. Every step is checked against the chain and written to docs/evidence/v3-run.json.
  *
  *   pnpm --filter examples evidence
  *
@@ -249,6 +249,33 @@ await childPays("Refusals are recorded", "Child tries to pay a place that isn't 
     record({ feature: "Parent override", step: `Parent decides the vetoed charge #${c2.chargeId} was fine and pays it anyway`, actor: "parent", expected: "paid; only the parent can do this", ok: (await chargeOf(c2.chargeId)).status === 4, tx: ov.hash });
   }
 
+  // Hold while the guardian is offline: the parent switches to a guardian that's offline and turns the hold on.
+  // Silence must no longer mean "paid": the charge waits past its window until the guardian checks in.
+  const offline = privateKeyToAccount(generatePrivateKey());
+  const gasTx = await wallet(parent).sendTransaction({ to: offline.address, value: parseUnits("0.005", 18), type: "legacy" });
+  await client.waitForTransactionReceipt({ hash: gasTx });
+  await call(parent, "setGuardian", [vaultId, offline.address]);
+  const h = await call(parent, "setGuardianHold", [vaultId, true]);
+  record({ feature: "Hold while the guardian is offline", step: "Parent switches to a guardian that is offline and turns the hold on", actor: "parent", expected: "hold on", ok: (await client.readContract({ address: rails, abi: pocketRailsAbi, functionName: "holdIfGuardianSilent", args: [vaultId] })) === true, tx: h.hash });
+  const c3 = await charge(billingId, usd("0.1"), `Lunch ${new Date().toISOString().slice(0, 16)} (evidence, guardian offline)`);
+  const due = (await chargeOf(c3.chargeId)).settleAfter;
+  while ((await client.getBlock()).timestamp < due + 2n) await sleep(5000);
+  const held = await client.readContract({ address: rails, abi: pocketRailsAbi, functionName: "isHeld", args: [c3.chargeId] });
+  let early = "";
+  try {
+    await client.simulateContract({ account: parent, address: rails, abi: pocketRailsAbi, functionName: "settle", args: [c3.chargeId] });
+    early = "accepted (unexpected)";
+  } catch (e) {
+    const reverted = e instanceof BaseError ? e.walk((x) => x instanceof ContractFunctionRevertedError) : undefined;
+    early = reverted instanceof ContractFunctionRevertedError && reverted.data?.errorName ? `reverted with ${reverted.data.errorName}()` : e instanceof BaseError ? e.shortMessage : String(e);
+  }
+  record({ feature: "Hold while the guardian is offline", step: `School charge #${c3.chargeId} passes its 2-minute window while the guardian is offline; someone tries to settle it`, actor: "anyone", expected: "held: not paid", ok: held && early.includes("GuardianSilent") && (await chargeOf(c3.chargeId)).status === 1, outcome: early, tx: c3.hash, note: "settle checked with a simulation" });
+  const reviewedUntil = (await client.getBlock()).timestamp;
+  const ci = await call(offline, "guardianCheckIn", [reviewedUntil]);
+  record({ feature: "Hold while the guardian is offline", step: "The guardian comes back online and checks in (it has seen the charge and lets it through)", actor: "guardian", expected: "charge no longer held", ok: !(await client.readContract({ address: rails, abi: pocketRailsAbi, functionName: "isHeld", args: [c3.chargeId] })), tx: ci.hash });
+  const st = await call(parent, "settle", [c3.chargeId]);
+  record({ feature: "Hold while the guardian is offline", step: `Charge #${c3.chargeId} is settled`, actor: "anyone", expected: "paid", ok: (await chargeOf(c3.chargeId)).status === 4, tx: st.hash });
+
   const rb = await call(parent, "revokeBilling", [billingId]);
   record({ feature: "Stop anything", step: `Parent revokes billing #${billingId}`, actor: "parent", expected: "revoked", ok: true, tx: rb.hash });
   const late = await charge(billingId, usd("0.1"), "Lunch (after revoke)");
@@ -273,7 +300,7 @@ record({ feature: "Child pays on their own", step: "Child's gas balance after th
 
 const failed = steps.filter((s) => !s.ok).length;
 const out = {
-  run: "PocketRails v2 evidence run",
+  run: "PocketRails v3 evidence run",
   network: { name: chain.name, chainId: chain.id, explorer: "https://explorer-test.qday.info" },
   contract: rails,
   hostedApp: APP_URL,
@@ -287,8 +314,8 @@ const out = {
   failed,
   steps: steps.map((s) => ({ ...s, explorer: s.tx ? txUrl(s.tx) : undefined })),
 };
-const file = path.resolve(import.meta.dirname, "../../docs/evidence/v2-run.json");
+const file = path.resolve(import.meta.dirname, "../../docs/evidence/v3-run.json");
 await mkdir(path.dirname(file), { recursive: true });
 await writeFile(file, JSON.stringify(out, null, 2) + "\n");
-console.log(`\n${steps.length - failed}/${steps.length} checks passed. Written to docs/evidence/v2-run.json`);
+console.log(`\n${steps.length - failed}/${steps.length} checks passed. Written to docs/evidence/v3-run.json`);
 process.exit(failed === 0 ? 0 : 1);

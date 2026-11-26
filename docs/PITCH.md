@@ -27,19 +27,21 @@ Spending limits are only the base: the school pulls charges under a veto window,
 and refusals are recorded on-chain with a reason code instead of reverting.
 
 **What happens if the guardian agent is offline or wrong?**
-If it's offline, charges inside the caps still settle after the window, like a direct debit, so the parent sets
-tight caps and can require approval of the first charge; if it vetoes wrongly, the parent can pay the charge anyway
+If it's offline, the parent chooses: by default charges inside the caps settle after the window, like a direct
+debit; with "hold while the guardian is offline" turned on, a charge waits until the guardian comes back and checks
+in (the parent can still approve or stop it meanwhile). If it vetoes wrongly, the parent can pay the charge anyway
 from the parent screen ("Stopped charges", which calls `approveCharge`), and the guardian can never approve. On 50 frozen test notes, rules + AI vetoed every bad charge (including 16 prompt
-injections) and no genuine one ([AI_EVAL.md](AI_EVAL.md)).
+injections) and no genuine one; on a harder set of 42 it scored 86%: every injection caught, but it wrongly stopped
+2 of 15 genuine charges (a teacher gift collection, a PTA donation) and let 2 small overcharges through
+([AI_EVAL.md](AI_EVAL.md)). That's why it can only say no.
 
 **Why would a school use this?**
 Our hypothesis, not yet tested with schools: pre-approved, capped collection for meals, transport and trips
 without chasing payments or handling cash, for a small fee per charge or per month.
 
 **What does it not do?**
-It runs on testnet only and isn't audited, has no fiat on- or off-ramp, doesn't use smart accounts or session
-keys yet, keeps payees and amounts public on-chain, and doesn't stop charges inside the caps when the guardian
-is offline.
+It runs on testnet only and isn't audited, has no fiat on- or off-ramp, keeps payees and amounts public on-chain,
+and only the guardian is a smart account so far (the parent and child use ordinary wallets).
 
 ## Sources in the repo
 

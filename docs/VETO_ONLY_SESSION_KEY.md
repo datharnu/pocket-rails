@@ -2,17 +2,17 @@
 
 Pocket Rails' guardian is an AI agent. We wanted it to be able to **stop** a payment but never **approve**, move
 money or change anything else, even if the AI is tricked or its server is compromised. The answer was a tiny
-ERC-7579 validator module that turns an ordinary session key into a key for exactly one function on exactly one
-contract. It runs live on Aevum today, and the pattern works for any "an agent may do this one safe thing" need.
+ERC-7579 validator module that turns an ordinary session key into a key for two harmless functions on exactly one
+contract: `vetoCharge` (say no) and `guardianCheckIn` (say "I'm online", used by the parent's hold setting). It runs live on Aevum today, and the pattern works for any "an agent may do this one safe thing" need.
 
 | | |
 |---|---|
 | Contract | [`contracts/src/VetoOnlySessionValidator.sol`](../contracts/src/VetoOnlySessionValidator.sol) (~150 lines, MIT) |
-| On Aevum | [`0xCC02a255bb48927090F23bB86DA497830eE0fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) (verified) |
-| Account | Kernel v3.1 [`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0), EntryPoint v0.7, QDay's bundler `https://bundler.qday.info` |
+| On Aevum | [`0xF04499Ed367E72299119E603E64CE4baf7a960A5`](https://explorer-test.qday.info/address/0xF04499Ed367E72299119E603E64CE4baf7a960A5?tab=contract) (verified, for PocketRails v3); the v2 version, veto only: [`0xCC02…fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) |
+| Account | Kernel v3.1 [`0x3FE5AE286D3653aa983fE20633cFd9CaB7220382`](https://explorer-test.qday.info/address/0x3FE5AE286D3653aa983fE20633cFd9CaB7220382), EntryPoint v0.7, QDay's bundler `https://bundler.qday.info` |
 | Agent side | [`agents/src/userop.ts`](../agents/src/userop.ts): builds, signs and sends the user operation (viem, no SDK) |
 | Install | [`contracts/script/DeployGuardianAccount.s.sol`](../contracts/script/DeployGuardianAccount.s.sol): creates the account with the module installed |
-| Tests | [8 unit tests](../contracts/test/VetoOnlySessionValidator.t.sol) and [10 fork tests](../contracts/test/fork/GuardianAccountFork.t.sol) against Aevum's real EntryPoint and Kernel |
+| Tests | [10 unit tests](../contracts/test/VetoOnlySessionValidator.t.sol) and [11 fork tests](../contracts/test/fork/GuardianAccountFork.t.sol) against Aevum's real EntryPoint and Kernel |
 | Live proof | Vetoes sent as user operations: see [EVIDENCE.md](EVIDENCE.md) |
 
 ## What it enforces
@@ -23,8 +23,9 @@ anything executes (and before the account pays for execution):
 1. The operation calls Kernel `execute(bytes32 mode, bytes executionCalldata)` in **single-call default mode**
    (`mode == 0`): no batches, no delegatecall.
 2. The one call goes to the **one contract** set at install time, with **value 0**.
-3. The called function is **`vetoCharge(uint256,string)`**. The selector is masked to 4 bytes, so trailing data
-   can't fake it.
+3. The called function is **`vetoCharge(uint256,string)`** or **`guardianCheckIn(uint64)`**. The selector is masked
+   to 4 bytes, so trailing data can't fake it. Neither can approve a charge or move money: a check-in only releases
+   charges the parent chose to hold while the guardian was offline, and they still have to be inside their caps.
 4. The signature is the **session key's** (raw `userOpHash` or EIP-191 signed hash).
 5. The session's expiry is returned as **`validUntil`**, so the EntryPoint enforces it without reading the clock
    during validation (ERC-7562), and storage is keyed by the account (also ERC-7562).

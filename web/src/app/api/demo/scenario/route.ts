@@ -34,16 +34,20 @@ let busy = false;
 
 // Which charges were sent by this button, so the judge page can label them as simulated.
 const LOG = path.join(process.cwd(), ".cache", "demo-charges.json");
-type LogEntry = { chargeId: string; kind: Kind; hash: string; at: string };
-async function readLog(): Promise<LogEntry[]> {
+// `rails` ties an entry to its contract: charge ids restart on every deployment. Entries without it are from v2.
+type LogEntry = { chargeId: string; kind: Kind; hash: string; at: string; rails?: string };
+async function readAll(): Promise<LogEntry[]> {
   try {
     return JSON.parse(await readFile(LOG, "utf8")) as LogEntry[];
   } catch {
     return [];
   }
 }
+async function readLog(rails: string): Promise<LogEntry[]> {
+  return (await readAll()).filter((e) => e.rails?.toLowerCase() === rails.toLowerCase());
+}
 async function appendLog(e: LogEntry) {
-  const all = [...(await readLog()), e].slice(-500);
+  const all = [...(await readAll()), e].slice(-500);
   await mkdir(path.dirname(LOG), { recursive: true });
   await writeFile(LOG, JSON.stringify(all));
 }
@@ -76,7 +80,7 @@ export async function GET() {
       vaultId: b.vaultId.toString(),
       guardian: v.guardian,
       price: c.price.toString(),
-      simulated: await readLog(),
+      simulated: await readLog(c.rails),
     });
   } catch {
     return NextResponse.json({ enabled: false });
@@ -138,7 +142,7 @@ export async function POST(req: Request) {
       const count = (await client.readContract({ address: c.rails, abi: pocketRailsAbi, functionName: "chargeCount" })) as bigint;
       let memo: Hex | undefined;
       let amount = c.price;
-      const simulated = new Set((await readLog()).map((x) => x.chargeId));
+      const simulated = new Set((await readLog(c.rails)).map((x) => x.chargeId));
       for (let id = count; id >= 1n && !memo; id--) {
         if (simulated.has(id.toString())) continue;
         const ch = await client.readContract({ address: c.rails, abi: pocketRailsAbi, functionName: "getCharge", args: [id] });
@@ -150,7 +154,7 @@ export async function POST(req: Request) {
       if (!memo) throw new Error("There's no real charge to duplicate yet. Try the trick note or over-cap demo.");
       result = await charge(amount, memo);
     }
-    await appendLog({ chargeId: result.chargeId.toString(), kind, hash: result.hash, at: new Date().toISOString() });
+    await appendLog({ chargeId: result.chargeId.toString(), kind, hash: result.hash, at: new Date().toISOString(), rails: c.rails });
     return NextResponse.json({ kind, hash: result.hash, chargeId: result.chargeId.toString(), outcome: JSON.parse(JSON.stringify(result.outcome, (_k, v) => (typeof v === "bigint" ? v.toString() : v))) });
   } catch (e) {
     if (e instanceof BaseError && /insufficient funds/i.test(e.message)) return NextResponse.json({ error: "The school's demo key is out of gas. Please tell the team." }, { status: 503 });

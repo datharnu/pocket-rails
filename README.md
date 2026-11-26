@@ -46,7 +46,7 @@ is not audited.
 |---|---|
 | **Demo video** | **[Watch it (2:52)](https://drive.google.com/file/d/1z5sLiR3Ho5PoqXoR5B9euyskDG-Ut2Nc/view)**: a child pays and is refused, the school bills, and the AI guardian stops a trick charge, all live on Aevum |
 | **Live app** | **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)**, with the school billing agent and the guardian smart account running 24/7 on Railway |
-| **Contract** | v2 [`0xB179…3801` on the Aevum explorer](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) (source verified); v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) holds the first live runs |
+| **Contract** | v3 [`0xa37f…E05c` on the Aevum explorer](https://explorer-test.qday.info/address/0xa37f27487562a1595768A681Ee21D3e93FFcE05c) (source verified); v2 [`0xB179…3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801) and v1 [`0x7d54…40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df) keep the earlier live runs |
 | **Evidence** | [docs/EVIDENCE.md](docs/EVIDENCE.md): every v2 feature run live through the hosted app and AI guardian, 29/29 checks, each with its transaction |
 | **Live runs** | [docs/DEMO_RUN.md](docs/DEMO_RUN.md): the first runs, and how the guardian smart account was set up |
 | **Demo accounts** | [docs/TESTNET_ACCOUNTS.md](docs/TESTNET_ACCOUNTS.md) |
@@ -147,7 +147,7 @@ the [Safety model](#safety-model).
 | `PocketRails.sol`: vaults, versioned rules, child payments, recorded refusals, one-time exceptions, school billing with veto window, revocation | Done: 67 unit and fuzz tests, plus an invariant suite that checks 4 properties over 128,000 random calls (forge reports the suite as 1 test, hence 76 in total), and 2 fork tests on the real tUSD8 |
 | TypeScript SDK (`packages/pocket-rails`): ABI, EIP-712 intents, reason codes, outcome decoding | Done |
 | Relayer for child intents (`/api/rails/relay`) and outcome lookup (`/api/rails/tx`) | Done, tested end to end on a local chain (`pnpm example demo-flow`) |
-| Deployment to Aevum testnet | v2 (adds money set aside for school) done and **source verified**: `0xB179197A660029b1d96FEF09e3E8515b271E3801`. v1, with the first live runs: `0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df` |
+| Deployment to Aevum testnet | v3 (adds "hold school charges while the guardian is offline") done and **source verified**: `0xa37f27487562a1595768A681Ee21D3e93FFcE05c`. v2 (`0xB179197A660029b1d96FEF09e3E8515b271E3801`) and v1 (`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`) keep the earlier live runs |
 | Screens: home, parent, child (phone-first), school, guardian | Done (`web/src/app`) |
 | History cache for the on-chain timeline (`/api/rails/events`) | Done |
 | Guardian agent and school billing agent (`agents/`) | Done, run live on Aevum with AI review ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)) |
@@ -344,9 +344,9 @@ contract refuses and records it). Settings: `agents/.env.example`. Rule tests: `
 | Old signed intents after a revoke | Revoking bumps an epoch; intents and exceptions from older epochs are refused. |
 | School billing key is stolen | Charges are capped per charge and per period, wait out a veto window, and settle only to the treasury address the parent approved. |
 | School overcharges or double-charges | The guardian agent or parent vetoes inside the window. |
-| Guardian agent's key is stolen | In smart-account mode the agent holds only a session key, which the validator module lets make the account call `vetoCharge` and nothing else (no approvals, no transfers, no other contracts, no value), until it expires. The owner key stays with the guardian and can revoke the session; the parent can also replace the guardian. |
+| Guardian agent's key is stolen | In smart-account mode the agent holds only a session key, which the validator module lets make the account call `vetoCharge` or `guardianCheckIn` and nothing else (no approvals, no transfers, no other contracts, no value), until it expires. A stolen session key could check in without reviewing, which is no worse than having no hold. The owner key stays with the guardian and can revoke the session; the parent can also replace the guardian. |
 | Guardian agent is fooled (prompt injection) or wrong | It can only veto. It can't approve, raise a limit or move money. The worst case is a wrongful veto, which the parent can override. |
-| Guardian agent is offline | Charges inside the caps still settle after the window, like a bank direct debit. Use the first-charge approval and tight caps; a "hold all if the guardian is offline" setting is on the roadmap. |
+| Guardian agent is offline | By default, charges inside the caps still settle after the window, like a bank direct debit. A parent who'd rather wait turns on **"hold school charges while the guardian is offline"** (`setGuardianHold`): a charge then settles only after the guardian has checked in (`guardianCheckIn(reviewedUntil)`) with a time later than the charge's request, so silence no longer means "paid". The guardian passes the time of the chain state it reviewed, never "now", so a charge that arrives while its check-in is in flight stays held. While held, the parent and guardian can still veto and the parent can still approve. Checking in approves nothing: caps and the veto window still apply. |
 | Admin abuse | There is no admin, owner or upgrade path. Only a vault's parent can change that vault. |
 | Parent key is stolen | Out of scope for the contract: the parent key is the root of authority. Roadmap: parent as a smart account with recovery. |
 | Privacy | Memos are stored as hashes only. Payees and amounts are public on any public chain; don't put personal details in labels. |
@@ -381,10 +381,10 @@ same way a direct debit works.
 | **`eth_getLogs` limited to 1,000 blocks; ~1 block/second** | History is scanned server-side in parallel 1,000-block chunks, cached to disk, then read incrementally. Current state never depends on logs: it's read from contract views. | `web/src/lib/indexer.ts` |
 | **No WebSocket RPC** | The app and agents poll over HTTPS (transaction status every 1.5 s, state every few seconds). | `web/src/app/api/rails/tx/route.ts`, `agents/` |
 | **Multicall3** | Lists (allowances, requests, charges) are read in one call each. Agents fall back to single reads on chains without it. | `web/src/lib/rails.ts`, `agents/src/lib.ts` |
-| **Explorer (Blockscout)** | Source of both versions verified; every screen and log links transactions to it. | [v2 contract page](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract) |
+| **Explorer (Blockscout)** | Source of every version verified; every screen and log links transactions to it. | [v3 contract page](https://explorer-test.qday.info/address/0xa37f27487562a1595768A681Ee21D3e93FFcE05c?tab=contract) |
 | **Starter kit** (`qday-io/aevum-starter-kit`) | Foundry setup, `MockUSD8`, Shanghai check, chunked log helper, chain config, Next.js scaffolding, relayer protections. Credited in `NOTICE.md`. | `packages/aevum`, `tools/` |
 | **Faucets** | Demo accounts were funded from the Discord faucet (the web faucet requires mainnet holdings); demo amounts are scaled to one claim. | `docs/PLATFORM_FEEDBACK.md` |
-| **ERC-4337 EntryPoint v0.7, Kernel v3.1 and QDay's bundler** | The guardian is a Kernel v3.1 smart account created with Aevum's deployed Kernel factory. Its agent's session key is limited by our ERC-7579 validator module to `vetoCharge`; vetoes are ERC-4337 user operations sent through `bundler.qday.info` to EntryPoint v0.7, and the account pays its own gas. | [`VetoOnlySessionValidator.sol`](contracts/src/VetoOnlySessionValidator.sol), [`agents/src/userop.ts`](agents/src/userop.ts), [`GuardianAccountFork.t.sol`](contracts/test/fork/GuardianAccountFork.t.sol) |
+| **ERC-4337 EntryPoint v0.7, Kernel v3.1 and QDay's bundler** | The guardian is a Kernel v3.1 smart account created with Aevum's deployed Kernel factory. Its agent's session key is limited by our ERC-7579 validator module to `vetoCharge` and `guardianCheckIn`; vetoes and check-ins are ERC-4337 user operations sent through `bundler.qday.info` to EntryPoint v0.7, and the account pays its own gas. | [`VetoOnlySessionValidator.sol`](contracts/src/VetoOnlySessionValidator.sol), [`agents/src/userop.ts`](agents/src/userop.ts), [`GuardianAccountFork.t.sol`](contracts/test/fork/GuardianAccountFork.t.sol) |
 | **ERC-8004 identity registry** | **Not used.** The starter kit says QDay's registry isn't open for this challenge, so approved places are stored in PocketRails. | Roadmap |
 
 ### Guardian smart account and veto-only session key
@@ -393,18 +393,20 @@ The guardian, the one role an AI agent plays, runs as a **Kernel v3.1 smart acco
 owner is the guardian's own key (Kernel's ECDSA root validator). The agent never gets that key: it gets a
 **session key** installed in [`VetoOnlySessionValidator`](contracts/src/VetoOnlySessionValidator.sol), an ERC-7579
 validator module we wrote. During ERC-4337 validation, before anything executes, the module checks that the
-operation is a single Kernel `execute` call to PocketRails, with no value, calling `vetoCharge`, signed by the
+operation is a single Kernel `execute` call to PocketRails, with no value, calling `vetoCharge` or
+`guardianCheckIn` (the "I'm online and have reviewed up to here" signal used by the hold setting), signed by the
 session key, and it returns the session's expiry as `validUntil` so the EntryPoint enforces it. Anything else is
 refused: approving a charge, moving tokens, calling another contract, changing the account, a wrong signer, an
 expired or revoked session.
 
 | | Address / proof |
 |---|---|
-| Veto-only validator module (source verified) | [`0xCC02a255bb48927090F23bB86DA497830eE0fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) |
-| Guardian smart account (Kernel v3.1 proxy) | [`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0) |
+| Veto-only validator module for v3 (source verified) | [`0xF04499Ed367E72299119E603E64CE4baf7a960A5`](https://explorer-test.qday.info/address/0xF04499Ed367E72299119E603E64CE4baf7a960A5?tab=contract) (v2's: [`0xCC02…fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract)) |
+| Guardian smart account for v3 (Kernel v3.1 proxy) | [`0x3FE5AE286D3653aa983fE20633cFd9CaB7220382`](https://explorer-test.qday.info/address/0x3FE5AE286D3653aa983fE20633cFd9CaB7220382) (v2's: [`0x4D22…31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0)) |
 | Agent's session key (holds no funds) | `0xE0078d6bE769bEe23Ad5D4eAcE941A2053a61F97`, valid 30 days |
 | Live veto as a user operation through `bundler.qday.info` | [tx](https://explorer-test.qday.info/tx/0x3f6322ba62ccfdf7ea6f06bb2dbd51495d7b69153a59d0b28e9093ab943ca5a5) to EntryPoint v0.7: charge #2 on allowance #1 (v2) vetoed, `ChargeVetoed` by the smart account, no paymaster |
-| Tests | 8 unit tests ([`VetoOnlySessionValidator.t.sol`](contracts/test/VetoOnlySessionValidator.t.sol)) and 10 fork tests on Aevum's real EntryPoint, Kernel factory and ECDSA validator ([`GuardianAccountFork.t.sol`](contracts/test/fork/GuardianAccountFork.t.sol)), each refusal checked against its exact EntryPoint error |
+| Live check-in as a user operation (v3) | [tx](https://explorer-test.qday.info/tx/0x463cd99ab5d543b4a238a0b701c15503c6560f4702ad1451a6278ea96c6bb787): charges #1–2 on allowance #1 were held past their window with the guardian offline; the agent came online, reviewed them, checked in, and the school [collected](https://explorer-test.qday.info/tx/0x5dee4c2e327e9e421c3852392337948f36b5c1f90d2ac2a06ba7017f50b1a25d) |
+| Tests | 10 unit tests ([`VetoOnlySessionValidator.t.sol`](contracts/test/VetoOnlySessionValidator.t.sol)) and 11 fork tests on Aevum's real EntryPoint, Kernel factory and ECDSA validator ([`GuardianAccountFork.t.sol`](contracts/test/fork/GuardianAccountFork.t.sol)), each refusal checked against its exact EntryPoint error |
 
 How to reproduce: [`contracts/script/DeployGuardianAccount.s.sol`](contracts/script/DeployGuardianAccount.s.sol) deploys
 the module and creates the account; the guardian agent's smart-account mode (`GUARDIAN_ACCOUNT`,
@@ -440,21 +442,24 @@ These are plans and hypotheses, not validated results.
 
 | Contract | Address (Aevum testnet, chain 44005) |
 |---|---|
-| PocketRails **v2** (current) | [`0xB179197A660029b1d96FEF09e3E8515b271E3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801), deployed in block 4084193 by tx [`0x09658ff1…e5a7`](https://explorer-test.qday.info/tx/0x09658ff197ae84ed1e43bd299af97a88f5b3c0c0ab78e8b29c2382292463e5a7) from commit [`e747b93`](https://github.com/datharnu/pocket-rails/tree/e747b93) |
+| PocketRails **v3** (current) | [`0xa37f27487562a1595768A681Ee21D3e93FFcE05c`](https://explorer-test.qday.info/address/0xa37f27487562a1595768A681Ee21D3e93FFcE05c), deployed in block 4148736 by tx [`0x6b9b1869…69e7`](https://explorer-test.qday.info/tx/0x6b9b1869e2e59218eb02f3366625d9771039d6c27cc539fa5ceb23829e9569e7) from commit [`32877a4`](https://github.com/datharnu/pocket-rails/tree/32877a4) |
+| PocketRails v2 | [`0xB179197A660029b1d96FEF09e3E8515b271E3801`](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801), deployed in block 4084193 by tx [`0x09658ff1…e5a7`](https://explorer-test.qday.info/tx/0x09658ff197ae84ed1e43bd299af97a88f5b3c0c0ab78e8b29c2382292463e5a7) from commit [`e747b93`](https://github.com/datharnu/pocket-rails/tree/e747b93) |
 | PocketRails v1 (first live runs) | [`0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df`](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df), deployed in block 4072059 by tx [`0xc77c22a4…b728`](https://explorer-test.qday.info/tx/0xc77c22a458fe2fc54d47085ccc195e5e496764174d01b502f03eeb9ffdabb728) |
-| VetoOnlySessionValidator | [`0xCC02a255bb48927090F23bB86DA497830eE0fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) (source verified) |
-| Guardian smart account (Kernel v3.1) | [`0x4D22c96D456CA81892C925bB2044DD28d21a31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0) |
+| VetoOnlySessionValidator (v3) | [`0xF04499Ed367E72299119E603E64CE4baf7a960A5`](https://explorer-test.qday.info/address/0xF04499Ed367E72299119E603E64CE4baf7a960A5?tab=contract) (source verified); for v2: [`0xCC02…fC7C`](https://explorer-test.qday.info/address/0xCC02a255bb48927090F23bB86DA497830eE0fC7C?tab=contract) |
+| Guardian smart account (Kernel v3.1) | v3: [`0x3FE5AE286D3653aa983fE20633cFd9CaB7220382`](https://explorer-test.qday.info/address/0x3FE5AE286D3653aa983fE20633cFd9CaB7220382); v2: [`0x4D22…31B0`](https://explorer-test.qday.info/address/0x4D22c96D456CA81892C925bB2044DD28d21a31B0) |
 | tUSD8 | [`0x456569838f1d43009A91ebA4263147Afd7233483`](https://explorer-test.qday.info/address/0x456569838f1d43009A91ebA4263147Afd7233483) |
 
-**Both versions are source verified** on the Aevum explorer (Blockscout) on 2026-11-25: compiler 0.8.24,
-optimizer 200 runs, EVM `shanghai` ([v2 verified code](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract), [v1 verified code](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract)).
+**Every version is source verified** on the Aevum explorer (Blockscout) (v3 on 2026-11-26, v1 and v2 on 2026-11-25): compiler 0.8.24,
+optimizer 200 runs, EVM `shanghai` ([v3 verified code](https://explorer-test.qday.info/address/0xa37f27487562a1595768A681Ee21D3e93FFcE05c?tab=contract), [v2 verified code](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract), [v1 verified code](https://explorer-test.qday.info/address/0x7d54567d9D40641907B76A6b2fe6cb046e2B40Df?tab=contract)).
 v2 was deployed from commit [`e747b93`](https://github.com/datharnu/pocket-rails/tree/e747b93) and its deployed bytecode is identical to
 that build apart from immutable values; v1 was deployed from [`335f5e6`](https://github.com/datharnu/pocket-rails/tree/335f5e64b223e0ffcc10abab00407ea30c02d585).
-v2 adds money set aside for school; everything else is unchanged. The contracts have no upgrade path, so v1 stays on
+v2 adds money set aside for school. v3 was deployed from commit [`32877a4`](https://github.com/datharnu/pocket-rails/tree/32877a4) and adds
+"hold school charges while the guardian is offline" (`setGuardianHold`, `guardianCheckIn`, `isHeld`); everything
+else is unchanged. The showcase allowance moved to v3 (allowance #1, hold on). The contracts have no upgrade path, so v1 and v2 stay on
 chain as it was, with the first live runs ([docs/DEMO_RUN.md](docs/DEMO_RUN.md)). Reproduce the verification with:
 
 ```bash
-cd contracts && forge verify-contract 0xB179197A660029b1d96FEF09e3E8515b271E3801 src/PocketRails.sol:PocketRails \
+cd contracts && forge verify-contract 0xa37f27487562a1595768A681Ee21D3e93FFcE05c src/PocketRails.sol:PocketRails \
   --chain-id 44005 --verifier blockscout --verifier-url https://explorer-test.qday.info/api/ \
   --constructor-args $(cast abi-encode "constructor(address)" 0x456569838f1d43009A91ebA4263147Afd7233483)
 ```
@@ -606,7 +611,6 @@ Aevum has no WebSocket RPC, so clients poll it.
 
 - Parent and child as Kernel smart accounts too (the guardian already is), with recovery for the parent.
 - Payee identities through QDay's ERC-8004 registry once it's open.
-- "Hold all school charges while the guardian is offline" setting.
 - Fiat on- and off-ramps for cross-border family funding (not built today).
 
 ## Platform feedback

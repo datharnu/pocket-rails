@@ -24,7 +24,7 @@ that runs in production on the hosted demo.
 import { privateKeyToAccount } from "viem/accounts";
 import { deadlineIn, memoHash, paymentTypes, pocketRailsDomain, randomNonce, toWire, type Payment } from "@pocket-rails/sdk";
 
-const rails = "0xB179197A660029b1d96FEF09e3E8515b271E3801"; // PocketRails v2 on Aevum (chain 44005)
+const rails = "0xa37f27487562a1595768A681Ee21D3e93FFcE05c"; // PocketRails v3 on Aevum (chain 44005)
 const child = privateKeyToAccount(process.env.CHILD_KEY as `0x${string}`); // a TEST key; it needs no gas
 
 const payment: Payment = {

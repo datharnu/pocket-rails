@@ -91,6 +91,9 @@ money is a test **stablecoin** (a digital dollar). You don't need those words to
    - the guardian can **stop** it,
    - the parent can **approve** it early, or **stop** it.
 4. If nobody stops it, after the waiting time the school collects the money. ✓ Paid to the school's account.
+   - **Unless the parent turned on "hold while the guardian is offline"** (Parent → 🚦 Guardian). Then the charge
+     also waits for the guardian to come online and "check in" ("I'm here, I've looked"). If the guardian is down,
+     the charge just waits: nothing is paid by silence. The showcase allowance has this switched on.
 5. If the guardian stopped it by mistake, the parent can still **pay it anyway** (only the parent can).
 6. If the school asks for more than the limits, the robot cashier refuses it straight away and writes that down.
 
@@ -106,11 +109,11 @@ charges by the billing permission the parent gave.
 
 | Piece | Where it is | Does it need you? |
 |---|---|---|
-| The robot cashier (smart contract) | On Aevum. Current version (v2): `0xB179197A660029b1d96FEF09e3E8515b271E3801` ([see it](https://explorer-test.qday.info/address/0xB179197A660029b1d96FEF09e3E8515b271E3801?tab=contract)). | No. It's always there. |
+| The robot cashier (smart contract) | On Aevum. Current version (v3): `0xa37f27487562a1595768A681Ee21D3e93FFcE05c` ([see it](https://explorer-test.qday.info/address/0xa37f27487562a1595768A681Ee21D3e93FFcE05c?tab=contract)). | No. It's always there. |
 | The app (screens + messenger) | Hosted on Railway: **[web-production-b9d9f11e.up.railway.app](https://web-production-b9d9f11e.up.railway.app)** | No. It runs 24/7. (You can still run it on your Mac with `pnpm dev`.) |
 | School billing agent | Hosted on Railway, in the same service as the app | No. It bills one lunch per school day on the showcase allowance and collects it after the waiting time. |
-| Guardian agent | Hosted on Railway. It acts through the guardian **smart account** `0x4D22…31B0`, whose key can only stop charges | No. It checks every school charge on allowances it guards. |
-| Proof | [EVIDENCE.md](EVIDENCE.md) (every v2 feature, live) and [DEMO_RUN.md](DEMO_RUN.md) (the first runs) | No |
+| Guardian agent | Hosted on Railway. It acts through the guardian **smart account** `0x3FE5…0382`, whose key can only stop charges (and say "I'm online") | No. It checks every school charge on allowances it guards. |
+| Proof | [EVIDENCE.md](EVIDENCE.md) (every feature, live) and [DEMO_RUN.md](DEMO_RUN.md) (the first runs) | No |
 
 **The showcase allowance (#1)** is the family everyone sees: the homepage card, demo mode on every page and the
 judge page all show it. It holds about 3 tUSD8 (around 30 lunches) and the hosted agents keep it active. Try not
@@ -148,7 +151,7 @@ All are in MetaMask. Balances from 25 Nov 2026, late evening; they change as you
 | Relayer `0xF534…016E` | Messenger (the app's server) | 0.198 tQDAY | tQDAY for fees (enough for hundreds of payments) |
 | School `0x8C6a…368F` | School canteen + billing key of allowance #1 | 0.1 tQDAY | a little tQDAY for fees |
 | Guardian `0xEA66…00db` | Owner of the guardian smart account | 0.039 tQDAY | almost nothing |
-| Guardian smart account `0x4D22…31B0` | The guardian of allowance #1 | 0.109 tQDAY | tQDAY for its vetoes (about 0.0003 each) |
+| Guardian smart account `0x3FE5…0382` | The guardian of allowance #1 (v3) | 0.02 tQDAY | tQDAY for its vetoes (about 0.0003 each) |
 
 Most of the money is inside allowance #1 (3 tUSD8). Lunches paid to the School account can be sent back to
 Parent in MetaMask whenever you need tUSD8 for testing.
@@ -208,6 +211,7 @@ The hosted agents do this part by themselves. Watch it:
 | 5.2 | Open **For judges**, click **Send a trick note** | Within about 30 seconds: "Vetoed by the guardian smart account", with the AI's reason. |
 | 5.3 | Open **Guardian** → **Decisions** | The trick charge: **✋ Stopped by the guardian**, the reason, and a "See the veto" link. |
 | 5.4 | As **Parent**, open **School billing** | The same charge under **✋ Stopped charges**. Click **Pay it anyway**, read the box, then **Cancel**. (Only the parent could pay it. Don't pay the trick one.) |
+| 5.5 | As **Parent**, open **🚦 Guardian** | **⏸️ Hold while offline: on**, and when the guardian last checked in (usually "just now" or a few minutes ago). |
 
 The judge buttons are limited to 4 per visitor per hour and 30 a day.
 
@@ -229,7 +233,7 @@ judge page would stop working.
 |---|---|---|
 | 7.1 | Parent → **History** | Every payment, refusal, request, rule change, school charge and veto, newest first, each with a link. |
 | 7.2 | Click any link | The transaction on the Aevum explorer: the public record anyone can check. |
-| 7.3 | Open [EVIDENCE.md](EVIDENCE.md) | Every v2 feature run live through the hosted app and guardian: 29 checked steps, each with its transaction. |
+| 7.3 | Open [EVIDENCE.md](EVIDENCE.md) | Every feature run live through the hosted app and guardian, each checked step with its transaction. |
 
 ---
 
