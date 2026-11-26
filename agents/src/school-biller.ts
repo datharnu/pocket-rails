@@ -15,7 +15,7 @@
  *   DEMO_SCENARIO (optional, sent once): duplicate | overprice | trick | overcap
  */
 import { parseUnits } from "viem";
-import { ChargeStatus, billingIsLive, connect, env, explain, log, publishNote, send, sleep, snapshot, usd, type Snapshot } from "./lib";
+import { ChargeStatus, billingIsLive, connect, env, explain, guardianSilentFor, log, publishNote, send, sleep, snapshot, usd, type Snapshot } from "./lib";
 import { memoHash } from "@pocket-rails/sdk";
 import { isWeekend } from "./policy";
 
@@ -80,6 +80,8 @@ async function demoScenario(s: Snapshot, billingId: bigint) {
   }
 }
 
+const heldLogged = new Set<bigint>();
+
 async function tick() {
   const s = await snapshot(c);
   const me = c.account.address.toLowerCase();
@@ -89,6 +91,12 @@ async function tick() {
   for (const [id, ch] of s.charges) {
     const b = s.billings.get(ch.billingId)!;
     if (b.biller.toLowerCase() !== me || ch.status !== ChargeStatus.Pending || s.now < ch.settleAfter) continue;
+    if (guardianSilentFor(s, ch)) {
+      // The parent asked to hold charges until the guardian has reviewed them; it settles once it checks in.
+      if (!heldLogged.has(id)) log(AGENT, `charge #${id} is held: waiting for the family's guardian to come online`);
+      heldLogged.add(id);
+      continue;
+    }
     try {
       const { hash, outcome } = await send(c, "settle", [id]);
       log(AGENT, `settled charge #${id} (${usd(ch.amount)}) → ${outcome.kind}: ${outcome.message} ${c.link(hash)}`);

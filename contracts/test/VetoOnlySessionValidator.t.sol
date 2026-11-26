@@ -27,6 +27,22 @@ contract VetoOnlySessionValidatorTest is Test {
         v.checkCall(_exec(bytes32(0), abi.encodePacked(rails, uint256(0), _veto())), rails);
     }
 
+    function test_allowsAGuardianCheckIn() public view {
+        v.checkCall(_exec(bytes32(0), abi.encodePacked(rails, uint256(0), abi.encodeWithSignature("guardianCheckIn(uint64)", uint64(5)))), rails);
+    }
+
+    function test_rejectsApproveAndOtherRailsFunctions() public {
+        bytes4[3] memory denied = [
+            bytes4(keccak256("approveCharge(uint256)")),
+            bytes4(keccak256("setGuardianHold(uint256,bool)")),
+            bytes4(keccak256("withdraw(uint256,uint256,address)"))
+        ];
+        for (uint256 i; i < denied.length; i++) {
+            vm.expectRevert(abi.encodeWithSelector(VetoOnlySessionValidator.OnlyVetoCharge.selector, denied[i]));
+            v.checkCall(_exec(bytes32(0), abi.encodePacked(rails, uint256(0), denied[i], uint256(7))), rails);
+        }
+    }
+
     function test_rejectsBatchOrOtherModes() public {
         bytes32 batch = bytes32(uint256(0x01) << 248); // CALLTYPE_BATCH
         vm.expectRevert(VetoOnlySessionValidator.NotSingleCall.selector);

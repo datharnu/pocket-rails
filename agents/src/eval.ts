@@ -6,9 +6,13 @@
  * Writes agents/eval/results.json (every decision and reason) and docs/AI_EVAL.md (the summary).
  *
  *   pnpm --filter agents eval            (needs Anthropic API credentials; costs a little)
+ *   pnpm --filter agents eval --cases eval/hard-cases.json --out eval/hard-results.json
+ *     runs another case file; docs/AI_EVAL.md is only rewritten for the default set (or with --doc <path>).
  */
 import { execSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 import { parseUnits } from "viem";
 import { evaluate, type Decision } from "./policy";
 import { reviewNote } from "./review";
@@ -23,10 +27,18 @@ interface Case {
   maxPerCharge: string;
   expected: string;
   accept: string[];
+  why_hard?: string;
 }
 
 const root = new URL("../", import.meta.url).pathname;
-const set = JSON.parse(readFileSync(`${root}eval/cases.json`, "utf8")) as { cases: Case[]; usual_price: string };
+const { values: args } = parseArgs({ options: { cases: { type: "string" }, out: { type: "string" }, doc: { type: "string" } } });
+const casesPath = args.cases ?? "eval/cases.json"; // relative to agents/
+const outPath = args.out ?? "eval/results.json";
+const docPath = args.doc ?? (args.cases ? undefined : "../docs/AI_EVAL.md");
+const casesText = readFileSync(`${root}${casesPath}`, "utf8");
+const set = JSON.parse(casesText) as { cases: Case[]; usual_price: string };
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+const hashes = { cases: sha256(casesText), reviewPrompt: sha256(readFileSync(`${root}src/review.ts`, "utf8")) };
 const WEEKDAY = 1_795_608_000n; // a Wednesday, so the weekend rule never fires
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -61,7 +73,7 @@ async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Prom
 
 const commit = (() => {
   try {
-    return execSync("git log -1 --format=%h -- eval/cases.json src/review.ts", { cwd: root }).toString().trim();
+    return execSync(`git log -1 --format=%h -- ${casesPath} src/review.ts`, { cwd: root }).toString().trim() || "uncommitted";
   } catch {
     return "unknown";
   }
@@ -100,7 +112,7 @@ const splits: [string, Row[]][] = [
   ["Held-out", rows.filter((r) => r.split === "heldout")],
   ["Tune", rows.filter((r) => r.split === "tune")],
   ["All", rows],
-];
+].filter(([, rs]) => rs.length > 0) as [string, Row[]][];
 const systems: [System, string][] = [
   ["rules", "Rules only"],
   ["ai", "AI review only"],
@@ -114,10 +126,10 @@ const date = new Date().toISOString().slice(0, 10);
 let md = `# Guardian evaluation
 
 How well the guardian agent stops wrong school charges, measured on ${rows.length} school-charge notes
-([agents/eval/cases.json](../agents/eval/cases.json)). Run on ${date} with \`pnpm --filter agents eval\`; model
+([agents/${casesPath}](../agents/${casesPath})). Run on ${date} with \`pnpm --filter agents eval\`; model
 \`claude-opus-5-5\` at low effort; cases and prompt as of commit \`${commit}\` (frozen before this run; the prompt in
 [agents/src/review.ts](../agents/src/review.ts) was not changed for this set). Raw decisions and reasons:
-[agents/eval/results.json](../agents/eval/results.json).
+[agents/${outPath}](../agents/${outPath}).
 
 The guardian can only **veto** or leave a charge alone; "unknown" leaves it for the parent. It can never approve,
 so the worst a wrong answer can do is stop a genuine charge (which the parent can pay anyway) or let a bad one
@@ -150,6 +162,6 @@ md += misses.length
 md += `## Latency of the AI review\n\nMedian ${(p(0.5) / 1000).toFixed(1)} s, 95th percentile ${(p(0.95) / 1000).toFixed(1)} s (per charge, from this machine).\n\n`;
 md += `## Limits\n\n- ${rows.length} hand-written cases is a small set; it shows behaviour, not a guarantee.\n- The rules don't read notes, so on note-only problems the rules-only row shows what the AI adds.\n- A determined attacker might find notes that pass; that's why the guardian can only veto, and charges still wait\n  in the parent's veto window.\n`;
 
-writeFileSync(`${root}eval/results.json`, JSON.stringify({ date, commit, model: "claude-opus-5-5", rows }, null, 2));
-writeFileSync(`${root}../docs/AI_EVAL.md`, md);
+writeFileSync(`${root}${outPath}`, JSON.stringify({ date, commit, sha256: hashes, model: "claude-opus-5-5", rows }, null, 2));
+if (docPath) writeFileSync(`${root}${docPath}`, md);
 console.log(md);

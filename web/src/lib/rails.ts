@@ -175,6 +175,49 @@ export function useSpentThisWeek(vaultId?: bigint) {
   });
 }
 
+/**
+ * "Hold school charges while the guardian is offline": whether it's on for this vault, and up to when the guardian
+ * has reviewed charges (its last check-in). `isHeld` mirrors the contract's rule for one charge.
+ */
+export function useGuardianHold(vaultId?: bigint, guardian?: Address) {
+  const { rails, chainId } = useRails();
+  const hasGuardian = Boolean(guardian && guardian !== "0x0000000000000000000000000000000000000000");
+  const q = useReadContracts({
+    contracts: [
+      { address: rails, abi: pocketRailsAbi, functionName: "holdIfGuardianSilent", args: [vaultId ?? 0n], chainId },
+      { address: rails, abi: pocketRailsAbi, functionName: "guardianLastSeen", args: [guardian ?? "0x0000000000000000000000000000000000000000"], chainId },
+    ],
+    query: { enabled: Boolean(rails && vaultId), refetchInterval: 4000 },
+  });
+  const hold = (q.data?.[0]?.result as boolean | undefined) ?? false;
+  const lastSeen = (q.data?.[1]?.result as bigint | undefined) ?? 0n;
+  const isHeld = (c: Charge, b: Billing) =>
+    hold && hasGuardian && c.status === 1 && nowSec() >= c.settleAfter && lastSeen <= c.settleAfter - b.vetoWindow;
+  return { hold, lastSeen, hasGuardian, isHeld, isLoading: q.isLoading, refetch: q.refetch };
+}
+
+/** The same rule across many vaults (the school sees charges from every family it bills). */
+export function useHeldCheck(vaults: { id: bigint; data: Vault }[]) {
+  const { rails, chainId } = useRails();
+  const zero = "0x0000000000000000000000000000000000000000";
+  const guardians = [...new Set(vaults.map((v) => v.data.guardian.toLowerCase()))].filter((g) => g !== zero) as Address[];
+  const q = useReadContracts({
+    contracts: [
+      ...vaults.map((v) => ({ address: rails, abi: pocketRailsAbi, functionName: "holdIfGuardianSilent" as const, args: [v.id] as const, chainId })),
+      ...guardians.map((g) => ({ address: rails, abi: pocketRailsAbi, functionName: "guardianLastSeen" as const, args: [g] as const, chainId })),
+    ],
+    query: { enabled: Boolean(rails) && vaults.length > 0, refetchInterval: 4000 },
+  });
+  const hold = new Map(vaults.map((v, i) => [v.id, Boolean(q.data?.[i]?.result)]));
+  const seen = new Map<string, bigint>(guardians.map((g, i) => [g, (q.data?.[vaults.length + i]?.result as bigint | undefined) ?? 0n]));
+  const byId = new Map(vaults.map((v) => [v.id, v.data]));
+  return (c: Charge, b: Billing) => {
+    const v = byId.get(b.vaultId);
+    if (!v || !hold.get(b.vaultId) || v.guardian.toLowerCase() === zero) return false;
+    return c.status === 1 && nowSec() >= c.settleAfter && (seen.get(v.guardian.toLowerCase()) ?? 0n) <= c.settleAfter - b.vetoWindow;
+  };
+}
+
 // ------------------------------------------------------------------ history (from the server's event cache)
 
 export interface HistoryEvent {

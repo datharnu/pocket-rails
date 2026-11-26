@@ -4,8 +4,13 @@
  *
  *   pnpm --filter agents guardian
  *
- * What it can do: veto. What it can't: approve, raise a limit, move money. That isn't a promise in this file,
- * it's the contract: vetoCharge is the only function this key is allowed to call.
+ * What it can do: veto, and check in. What it can't: approve, raise a limit, move money. That isn't a promise in
+ * this file, it's the contracts: in smart-account mode the session key may only call vetoCharge and guardianCheckIn.
+ *
+ * Check-in: a parent can turn on "hold school charges while the guardian is offline". Then a charge only settles
+ * after the guardian has checked in with a time later than the charge, so this agent checks in after each review
+ * pass that leaves held charges decided. It passes the time of the chain state it reviewed, never "now", so a
+ * charge that arrives while the check-in is on its way stays held until the next pass.
  *
  * Each open charge goes through:
  *   1. deterministic rules (duplicate, weekend, price far above the usual) → veto if any matches
@@ -22,10 +27,10 @@
  * only allow to call vetoCharge. GUARDIAN_KEY isn't needed in this mode: the agent never holds the owner key.
  */
 import { parseUnits } from "viem";
-import { ChargeStatus, billingIsLive, connect, env, explain, log, readNotes, send, sleep, snapshot, usd, type Snapshot } from "./lib";
+import { ChargeStatus, billingIsLive, connect, env, explain, guardianSilentFor, log, readNotes, send, sleep, snapshot, usd, type Snapshot } from "./lib";
 import { evaluate, usualPrice, type ChargeFacts, type Decision } from "./policy";
 import { aiEnabled, reviewNote } from "./review";
-import { vetoViaSmartAccount } from "./userop";
+import { checkInViaSmartAccount, vetoViaSmartAccount } from "./userop";
 import type { Address } from "viem";
 
 const AGENT = "guardian";
@@ -63,8 +68,9 @@ async function tick() {
     const b = s.billings.get(f.billingId)!;
     if (!mine.has(b.vaultId) || !billingIsLive(s, b)) return false;
     const ch = s.charges.get(f.id)!;
-    // Pending: only while the window is open (the contract refuses later vetoes). Awaiting parent: any time.
-    return (f.status === ChargeStatus.Pending && s.now < ch.settleAfter) || f.status === ChargeStatus.AwaitingParent;
+    // Pending: while the window is open, or while it's held waiting for this guardian (the contract refuses
+    // other late vetoes). Awaiting parent: any time.
+    return (f.status === ChargeStatus.Pending && (s.now < ch.settleAfter || guardianSilentFor(s, ch))) || f.status === ChargeStatus.AwaitingParent;
   });
   if (open.length === 0) return;
 
@@ -106,10 +112,45 @@ async function tick() {
       if (!already || already.reason !== d.reason) {
         log(AGENT, `${d.action === "unknown" ? "UNKNOWN" : "ok"} ${label}: ${d.reason}${d.action === "unknown" ? " (left for the parent)" : ""}`);
       }
-      // A missing note may still arrive: look again next poll. Everything else is settled for this session.
-      if (d.rule !== "note") decided.set(f.id, d);
+      // A missing note may still arrive: look again next poll, until the charge's window is over.
+      // Everything else is settled for this session.
+      if (d.rule !== "note" || s.now >= s.charges.get(f.id)!.settleAfter) decided.set(f.id, d);
     }
   }
+
+  await checkIn(s, open);
+}
+
+/**
+ * Check in if a held (or soon-to-be-held) charge has been reviewed. Checks in up to the snapshot time, or just
+ * before the earliest charge this pass couldn't decide, so nothing unreviewed is ever released.
+ */
+let lastCheckInError = "";
+
+async function checkIn(s: Snapshot, open: ChargeFacts[]) {
+  const seen = s.lastSeen.get(guardianAddress.toLowerCase() as Address) ?? 0n;
+  const waiting = open.filter((f) => f.status === ChargeStatus.Pending && s.holds.get(s.billings.get(f.billingId)!.vaultId) && f.requestedAt >= seen);
+  if (waiting.length === 0) return;
+  const undecided = waiting.filter((f) => !decided.has(f.id)).map((f) => f.requestedAt);
+  // The contract releases a charge when reviewedUntil > requestedAt, so stopping at the earliest undecided
+  // charge's own request time keeps it (and anything later) held.
+  const until = undecided.length ? undecided.reduce((a, b) => (a < b ? a : b)) : s.now;
+  if (until <= seen || !waiting.some((f) => f.requestedAt < until)) return;
+  try {
+    if (SMART) {
+      const r = await checkInViaSmartAccount(c, { account: guardianAddress, validator, bundlerUrl, reviewedUntil: until });
+      log(AGENT, `checked in: reviewed everything requested before ${new Date(Number(until) * 1000).toISOString()} via user operation ${r.userOpHash.slice(0, 10)}… ${c.link(r.txHash)}`);
+    } else {
+      const { hash } = await send(c, "guardianCheckIn", [until]);
+      log(AGENT, `checked in: reviewed everything requested before ${new Date(Number(until) * 1000).toISOString()} ${c.link(hash)}`);
+    }
+  } catch (e) {
+    const why = explain(e);
+    if (why !== lastCheckInError) log(AGENT, `could not check in (will retry): ${why}`);
+    lastCheckInError = why;
+    return;
+  }
+  lastCheckInError = "";
 }
 
 for (;;) {

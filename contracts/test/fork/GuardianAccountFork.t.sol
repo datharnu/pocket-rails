@@ -163,6 +163,25 @@ contract GuardianAccountForkTest is Test {
         assertEq(uint8(rails.getCharge(chargeId).status), uint8(PocketRails.ChargeStatus.Vetoed));
     }
 
+    function test_sessionKeyChecksIn_releasingAHeldCharge() public {
+        deal(address(TUSD8), parent, 1e6);
+        vm.startPrank(parent);
+        TUSD8.approve(address(rails), 1e6);
+        rails.deposit(vaultId, 1e6);
+        rails.setGuardianHold(vaultId, true);
+        vm.stopPrank();
+
+        uint256 chargeId = _pendingCharge();
+        vm.warp(block.timestamp + 1 days);
+        vm.expectRevert(PocketRails.GuardianSilent.selector);
+        rails.settle(chargeId);
+
+        _send(_op(_execute(address(rails), 0, abi.encodeCall(PocketRails.guardianCheckIn, (uint64(block.timestamp)))), sessionPk));
+        assertEq(rails.guardianLastSeen(account), uint64(block.timestamp));
+        rails.settle(chargeId);
+        assertEq(uint8(rails.getCharge(chargeId).status), uint8(PocketRails.ChargeStatus.Settled));
+    }
+
     function test_sessionKeyCannotApprove() public {
         uint256 chargeId = _pendingCharge();
         bytes memory approve = _execute(address(rails), 0, abi.encodeCall(PocketRails.approveCharge, (chargeId)));

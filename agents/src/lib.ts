@@ -6,6 +6,7 @@ import {
   http,
   isAddress,
   isHex,
+  zeroAddress,
   type Address,
   type Hash,
   type Hex,
@@ -121,7 +122,25 @@ export async function snapshot(c: Conn) {
     readAll<Charge>(c, "chargeCount", "getCharge"),
     c.client.getBlock(),
   ]);
-  return { vaults, billings, charges, now: block.timestamp };
+  // "Hold while the guardian is offline": per-vault switch, and how far each guardian has reviewed.
+  const vaultIds = [...vaults.keys()];
+  const guardians = [...new Set([...vaults.values()].map((v) => v.guardian.toLowerCase()))].filter((g) => g !== zeroAddress) as Address[];
+  const [holdList, seenList] = await Promise.all([
+    Promise.all(vaultIds.map((id) => c.client.readContract({ address: c.rails, abi: pocketRailsAbi, functionName: "holdIfGuardianSilent", args: [id] }))),
+    Promise.all(guardians.map((g) => c.client.readContract({ address: c.rails, abi: pocketRailsAbi, functionName: "guardianLastSeen", args: [g] }))),
+  ]);
+  const holds = new Map(vaultIds.map((id, i) => [id, holdList[i]] as const));
+  const lastSeen = new Map(guardians.map((g, i) => [g, BigInt(seenList[i])] as const));
+  return { vaults, billings, charges, holds, lastSeen, now: block.timestamp };
+}
+
+/** Mirrors the contract: the hold is on, there's a guardian, and it hasn't reviewed up to the charge's request time. */
+export function guardianSilentFor(s: { vaults: Map<bigint, Vault>; billings: Map<bigint, Billing>; holds: Map<bigint, boolean>; lastSeen: Map<string, bigint> }, ch: Charge): boolean {
+  const b = s.billings.get(ch.billingId);
+  if (!b) return false;
+  const v = s.vaults.get(b.vaultId);
+  if (!v || !s.holds.get(b.vaultId) || v.guardian === zeroAddress) return false;
+  return (s.lastSeen.get(v.guardian.toLowerCase()) ?? 0n) <= ch.settleAfter - b.vetoWindow;
 }
 
 export type Snapshot = Awaited<ReturnType<typeof snapshot>>;

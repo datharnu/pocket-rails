@@ -28,6 +28,7 @@ import {
   useAllCharges,
   useAllExceptions,
   useAllVaults,
+  useGuardianHold,
   useServerNotes,
   useHistory,
   useRails,
@@ -442,6 +443,7 @@ function SchoolCharges({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
   const myBillings = new Map(billings.items.filter((b) => b.data.vaultId === vaultId).map((b) => [b.id, b.data]));
   const open = charges.items.filter((c) => myBillings.has(c.data.billingId) && (c.data.status === 1 || c.data.status === 2));
   const serverNote = useServerNotes(open.map((c) => c.data.memoHash));
+  const gh = useGuardianHold(vaultId, vault.guardian);
   if (open.length === 0 && status.state === "idle") return null;
   return (
     <section id="charges" className="card info" aria-label="School charges waiting">
@@ -452,6 +454,7 @@ function SchoolCharges({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
           const b = myBillings.get(c.billingId)!;
           const awaiting = c.status === 2;
           const windowOpen = nowSec() < c.settleAfter;
+          const held = gh.isHeld(c, b);
           return (
             <div key={id.toString()} className="item">
               <div className="item-main">
@@ -460,14 +463,20 @@ function SchoolCharges({ vaultId, vault, label }: { vaultId: bigint; vault: Vaul
                 </span>
                 <span className="item-sub">
                   “{serverNote(c.memoHash) ?? noteFor(c.memoHash) ?? "no note"}” · Charge #{id.toString()} ·{" "}
-                  {awaiting ? "first charge: waits for your approval" : windowOpen ? `settles in ${timeLeft(c.settleAfter)} unless vetoed` : "veto window over: ready to settle"}
+                  {awaiting
+                    ? "first charge: waits for your approval"
+                    : windowOpen
+                      ? `settles in ${timeLeft(c.settleAfter)} unless vetoed`
+                      : held
+                        ? "⏸️ on hold: waiting for your guardian to come online and check it"
+                        : "veto window over: ready to settle"}
                 </span>
               </div>
               <div className="actions">
                 <button type="button" className="btn small" disabled={busy} onClick={() => run((s) => write("approveCharge", [id], s))}>
                   Approve
                 </button>
-                {(awaiting || windowOpen) && (
+                {(awaiting || windowOpen || held) && (
                   <button type="button" className="btn small secondary" disabled={busy} onClick={() => run((s) => write("vetoCharge", [id, "Vetoed by parent"], s))}>
                     Veto
                   </button>
@@ -907,10 +916,12 @@ function Guardian({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
         </div>
         <StatusNotice status={status} />
       </section>
+      <GuardianHold vaultId={vaultId} vault={vault} />
       <section className="card">
         <PanelHead title="🔐 What a guardian can do" />
         <div className="powers" style={{ gridTemplateColumns: "1fr" }}>
           <div className="power yes">✋ Stop a school charge while it&apos;s waiting</div>
+          <div className="power yes">👋 Check in, to say it&apos;s online and has looked at what&apos;s waiting</div>
           <div className="power no">✗ Approve anything or pay early</div>
           <div className="power no">✗ Change limits or move money</div>
         </div>
@@ -918,6 +929,44 @@ function Guardian({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
       </section>
     </div>
   );
+}
+
+/** The "hold school charges while the guardian is offline" switch, with the guardian's last check-in. */
+function GuardianHold({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {
+  const write = useRailsWrite();
+  const { status, run, busy } = useAction();
+  const gh = useGuardianHold(vaultId, vault.guardian);
+  if (!gh.hasGuardian) return null;
+  return (
+    <section id="hold" className="card form" aria-label="Hold charges while the guardian is offline">
+      <PanelHead
+        title={gh.hold ? "⏸️ Hold while offline: on" : "⏸️ Hold while offline: off"}
+        sub={
+          gh.hold
+            ? "A school charge is only paid after your guardian has come online and checked it. If the guardian is down, charges wait, and you can still approve or stop them yourself."
+            : "Right now a charge is paid when its waiting time ends, even if your guardian is offline (like a normal direct debit)."
+        }
+      />
+      <dl className="facts">
+        <dt>Guardian last checked in</dt>
+        <dd>{gh.lastSeen === 0n ? "never" : `${dateOf(gh.lastSeen)} (${timeAgo(gh.lastSeen)})`}</dd>
+      </dl>
+      <div className="actions">
+        <button type="button" className={gh.hold ? "btn ghost" : "btn secondary"} disabled={busy || gh.isLoading} onClick={() => run((s) => write("setGuardianHold", [vaultId, !gh.hold], s))}>
+          {gh.hold ? "Turn hold off" : "Hold charges while the guardian is offline"}
+        </button>
+      </div>
+      <StatusNotice status={status} />
+    </section>
+  );
+}
+
+function timeAgo(ts: bigint): string {
+  const s = Number(nowSec() - ts);
+  if (s < 90) return "just now";
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
 }
 
 function Danger({ vaultId, vault }: { vaultId: bigint; vault: Vault }) {

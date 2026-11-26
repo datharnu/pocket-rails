@@ -19,6 +19,7 @@ import {
   useAllBillings,
   useAllCharges,
   useAllVaults,
+  useHeldCheck,
   useRails,
   useRailsWrite,
   useServerNotes,
@@ -46,7 +47,11 @@ export default function SchoolPage() {
   const isLive = (b: Billing) => !b.revoked && epochOf.get(b.vaultId) === b.epoch && nowSec() < b.expiresAt;
   const ids = new Set(mine.map((b) => b.id));
   const list = charges.items.filter((c) => ids.has(c.data.billingId));
-  const ready = list.filter((c) => c.data.status === 1 && nowSec() >= c.data.settleAfter);
+  // Charges the parent chose to hold until their guardian comes online and checks them.
+  const heldCheck = useHeldCheck(vaults.items);
+  const billingById = new Map(billings.items.map((b) => [b.id, b.data]));
+  const held = new Set(list.filter((c) => billingById.has(c.data.billingId) && heldCheck(c.data, billingById.get(c.data.billingId)!)).map((c) => c.id));
+  const ready = list.filter((c) => c.data.status === 1 && nowSec() >= c.data.settleAfter && !held.has(c.id));
   const waiting = list.filter((c) => c.data.status === 1 || c.data.status === 2);
 
   if (!rails) return <main className="shell"><NotDeployed /></main>;
@@ -141,14 +146,14 @@ export default function SchoolPage() {
                     </button>
                   }
                 />
-                <ChargeTable rows={list} billings={mine} limit={6} />
+                <ChargeTable held={held} rows={list} billings={mine} limit={6} />
               </section>
             </>
           )}
           {mine.length > 0 && view === "send" && <SendCharge permissions={mine.filter((b) => isLive(b.data))} />}
           {mine.length > 0 && view === "charges" && (
             <section className="card">
-              <ChargeTable rows={list} billings={mine} />
+              <ChargeTable held={held} rows={list} billings={mine} />
               <p className="fine" style={{ marginTop: 12 }}>
                 Over-cap charges aren&apos;t errors: they&apos;re recorded as refusals ({explainReason(9).message.toLowerCase()}) with a transaction you can show.
               </p>
@@ -161,16 +166,17 @@ export default function SchoolPage() {
   );
 }
 
-function statusChip(c: Charge) {
+function statusChip(c: Charge, held = false) {
   if (c.status === 4) return <Chip tone="good">✓ Paid</Chip>;
   if (c.status === 3) return <Chip tone="bad">✋ Stopped</Chip>;
   if (c.status === 5) return <Chip tone="plain">Couldn&apos;t be paid</Chip>;
   if (c.status === 2) return <Chip tone="warn">Waiting for parent</Chip>;
+  if (held) return <Chip tone="warn">⏸️ On hold: family&apos;s guardian is offline</Chip>;
   if (nowSec() >= c.settleAfter) return <Chip tone="info">Ready to collect</Chip>;
   return <Chip tone="warn">⏳ {timeLeft(c.settleAfter)} left</Chip>;
 }
 
-function ChargeTable({ rows, billings, limit = 50 }: { rows: Row[]; billings: { id: bigint; data: Billing }[]; limit?: number }) {
+function ChargeTable({ rows, billings, held, limit = 50 }: { rows: Row[]; billings: { id: bigint; data: Billing }[]; held?: Set<bigint>; limit?: number }) {
   const write = useRailsWrite();
   const { status, run, busy } = useAction();
   const serverNote = useServerNotes(rows.map((c) => c.data.memoHash));
@@ -194,7 +200,8 @@ function ChargeTable({ rows, billings, limit = 50 }: { rows: Row[]; billings: { 
           </thead>
           <tbody>
             {shown.map(({ id, data: c }) => {
-              const ready = c.status === 1 && nowSec() >= c.settleAfter;
+              const isHeld = held?.has(id) ?? false;
+              const ready = c.status === 1 && nowSec() >= c.settleAfter && !isHeld;
               return (
                 <tr key={id.toString()}>
                   <td className="mono">#{id.toString()}</td>
@@ -207,7 +214,7 @@ function ChargeTable({ rows, billings, limit = 50 }: { rows: Row[]; billings: { 
                         Collect
                       </button>
                     ) : (
-                      statusChip(c)
+                      statusChip(c, isHeld)
                     )}
                   </td>
                 </tr>

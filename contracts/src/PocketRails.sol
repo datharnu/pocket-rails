@@ -207,6 +207,11 @@ contract PocketRails is EIP712, ReentrancyGuard {
     mapping(uint256 exceptionId => Exception) private _exceptions;
     mapping(uint256 billingId => Billing) private _billings;
     mapping(uint256 chargeId => Charge) private _charges;
+    /// @notice When true, a pending charge on this vault can't settle until the guardian has checked in
+    ///         after the charge was requested (so a guardian that's offline can't be skipped by silence).
+    mapping(uint256 vaultId => bool) public holdIfGuardianSilent;
+    /// @notice Up to when each guardian key has reviewed charges (set by `guardianCheckIn`).
+    mapping(address guardian => uint64) public guardianLastSeen;
 
     // ------------------------------------------------------------------ events
 
@@ -229,6 +234,8 @@ contract PocketRails is EIP712, ReentrancyGuard {
         uint256 indexed vaultId, uint64 indexed version, address by, address child, bool active, uint64 epoch
     );
     event GuardianChanged(uint256 indexed vaultId, uint64 indexed version, address by, address guardian);
+    event GuardianHoldChanged(uint256 indexed vaultId, uint64 indexed version, address by, bool hold);
+    event GuardianCheckedIn(address indexed guardian, uint64 at);
     event SchoolReserveChanged(uint256 indexed vaultId, uint64 indexed version, address by, uint256 amount);
     event VaultRevoked(uint256 indexed vaultId, uint64 indexed version, address by, uint64 childEpoch, uint64 billingEpoch);
 
@@ -291,6 +298,7 @@ contract PocketRails is EIP712, ReentrancyGuard {
     error ChildInactive();
     error VetoWindowClosed();
     error VetoWindowOpen();
+    error GuardianSilent();
     error NotEnoughBalance();
     error LengthMismatch();
 
@@ -443,6 +451,27 @@ contract PocketRails is EIP712, ReentrancyGuard {
         v.guardian = guardian;
         uint64 version = ++v.version;
         emit GuardianChanged(vaultId, version, msg.sender, guardian);
+    }
+
+    /// @notice Turn on (or off) "hold school charges while the guardian is offline". While on, a pending
+    ///         charge settles only after the guardian has checked in since the charge was requested. The
+    ///         parent can still approve or veto a held charge at any time.
+    function setGuardianHold(uint256 vaultId, bool hold) external onlyParent(vaultId) {
+        holdIfGuardianSilent[vaultId] = hold;
+        uint64 version = ++_vaults[vaultId].version;
+        emit GuardianHoldChanged(vaultId, version, msg.sender, hold);
+    }
+
+    /// @notice A guardian says "I'm online and have reviewed every charge requested before `reviewedUntil`".
+    ///         It approves nothing: charges still need their veto window to pass and stay inside their caps.
+    ///         Pass the time of the chain state you reviewed, so charges that arrive while this transaction
+    ///         is on its way stay held. Capped at now; never moves backwards. One call covers every vault
+    ///         that names the caller as guardian.
+    function guardianCheckIn(uint64 reviewedUntil) external {
+        uint64 at = reviewedUntil > block.timestamp ? uint64(block.timestamp) : reviewedUntil;
+        if (at <= guardianLastSeen[msg.sender]) return;
+        guardianLastSeen[msg.sender] = at;
+        emit GuardianCheckedIn(msg.sender, at);
     }
 
     /// @notice Emergency stop: child access off, every billing permission and pending charge dead,
@@ -645,7 +674,8 @@ contract PocketRails is EIP712, ReentrancyGuard {
             revert NotParentOrGuardian();
         }
         if (c.status == ChargeStatus.Pending) {
-            if (block.timestamp >= c.settleAfter) revert VetoWindowClosed();
+            // A charge held for a silent guardian can still be vetoed after its window.
+            if (block.timestamp >= c.settleAfter && !_guardianSilent(v, b, c)) revert VetoWindowClosed();
         } else if (c.status != ChargeStatus.AwaitingParent) {
             revert BadState();
         }
@@ -674,13 +704,24 @@ contract PocketRails is EIP712, ReentrancyGuard {
         _settle(v, b, c, chargeId);
     }
 
-    /// @notice Anyone can settle a pending charge once its veto window has passed.
+    /// @notice Anyone can settle a pending charge once its veto window has passed (and, if the parent
+    ///         turned on the guardian hold, once the guardian has checked in since the charge was requested).
     function settle(uint256 chargeId) external nonReentrant {
         Charge storage c = _charges[chargeId];
         if (c.status != ChargeStatus.Pending) revert BadState();
         if (block.timestamp < c.settleAfter) revert VetoWindowOpen();
         Billing storage b = _billings[c.billingId];
-        _settle(_vaults[b.vaultId], b, c, chargeId);
+        Vault storage v = _vaults[b.vaultId];
+        if (_guardianSilent(v, b, c)) revert GuardianSilent();
+        _settle(v, b, c, chargeId);
+    }
+
+    /// @notice True when a pending charge is past its window but waiting for the guardian to check in.
+    function isHeld(uint256 chargeId) external view returns (bool) {
+        Charge storage c = _charges[chargeId];
+        if (c.status != ChargeStatus.Pending || block.timestamp < c.settleAfter) return false;
+        Billing storage b = _billings[c.billingId];
+        return _guardianSilent(_vaults[b.vaultId], b, c);
     }
 
     // ------------------------------------------------------------------ views
@@ -803,6 +844,12 @@ contract PocketRails is EIP712, ReentrancyGuard {
         if (amount > v.balance) return Reason.InsufficientBalance;
         if (amount > v.balance - v.schoolReserve) return Reason.EarmarkedForSchool;
         return Reason.None;
+    }
+
+    /// @dev The hold is on, there's a guardian, and it hasn't checked in since the charge was requested.
+    function _guardianSilent(Vault storage v, Billing storage b, Charge storage c) private view returns (bool) {
+        if (!holdIfGuardianSilent[b.vaultId] || v.guardian == address(0)) return false;
+        return guardianLastSeen[v.guardian] <= c.settleAfter - b.vetoWindow;
     }
 
     function _rollWeek(Vault storage v) private {

@@ -11,8 +11,8 @@ import type { Conn } from "./lib";
 
 /**
  * The guardian as a Kernel v3.1 smart account (ERC-4337 v0.7). Its session key is only allowed, by
- * contracts/src/VetoOnlySessionValidator.sol, to make the account call PocketRails `vetoCharge`, with no value,
- * until the session expires. Operations go through an ERC-4337 bundler (QDay runs one at bundler.qday.info).
+ * contracts/src/VetoOnlySessionValidator.sol, to make the account call PocketRails `vetoCharge` or
+ * `guardianCheckIn`, with no value, until the session expires. Operations go through an ERC-4337 bundler (QDay runs one at bundler.qday.info).
  */
 
 const kernelAbi = parseAbi(["function execute(bytes32 mode, bytes executionCalldata) payable"]);
@@ -53,22 +53,28 @@ export interface VetoResult {
   outcome: Outcome;
 }
 
+type SmartAccountOpts = { account: Address; validator: Address; bundlerUrl: string };
+
 /** Sends a `vetoCharge` from the guardian's smart account through the bundler and waits for it. */
-export async function vetoViaSmartAccount(
-  c: Conn,
-  opts: { account: Address; validator: Address; bundlerUrl: string; chargeId: bigint; reason: string },
-): Promise<VetoResult> {
+export function vetoViaSmartAccount(c: Conn, opts: SmartAccountOpts & { chargeId: bigint; reason: string }): Promise<VetoResult> {
+  const data = encodeFunctionData({ abi: pocketRailsAbi, functionName: "vetoCharge", args: [opts.chargeId, opts.reason] });
+  return railsCallViaSmartAccount(c, opts, data);
+}
+
+/** Sends a `guardianCheckIn(reviewedUntil)` from the guardian's smart account through the bundler. */
+export function checkInViaSmartAccount(c: Conn, opts: SmartAccountOpts & { reviewedUntil: bigint }): Promise<VetoResult> {
+  const data = encodeFunctionData({ abi: pocketRailsAbi, functionName: "guardianCheckIn", args: [opts.reviewedUntil] });
+  return railsCallViaSmartAccount(c, opts, data);
+}
+
+async function railsCallViaSmartAccount(c: Conn, opts: SmartAccountOpts, railsCall: Hex): Promise<VetoResult> {
   const nonce = await c.client.readContract({
     address: entryPoint07Address,
     abi: entryPoint07Abi,
     functionName: "getNonce",
     args: [opts.account, vetoOnlyNonceKey(opts.validator)],
   });
-  const callData = kernelExecute(
-    c.rails,
-    0n,
-    encodeFunctionData({ abi: pocketRailsAbi, functionName: "vetoCharge", args: [opts.chargeId, opts.reason] }),
-  );
+  const callData = kernelExecute(c.rails, 0n, railsCall);
 
   // Fees: the bundler's minimum priority fee plus 10%; Aevum's base fee is tiny.
   const minPriority = BigInt(await bundlerRpc<string>(opts.bundlerUrl, "rundler_maxPriorityFeePerGas", []));

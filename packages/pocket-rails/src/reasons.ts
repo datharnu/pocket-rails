@@ -136,6 +136,7 @@ export const revertText: Record<string, string> = {
   ChildInactive: "Spending is paused, so requests can't be sent right now.",
   VetoWindowClosed: "The time to stop this charge has passed.",
   VetoWindowOpen: "This charge is still in its waiting period.",
+  GuardianSilent: "This charge is held until the family's guardian comes online and reviews it.",
   BadRules: "Those rules aren't valid: limits must be above zero, the weekly limit at least the per-payment limit, and the end date in the future.",
   BadTerms: "Those billing terms aren't valid.",
   BadState: "This item can't change from its current state.",

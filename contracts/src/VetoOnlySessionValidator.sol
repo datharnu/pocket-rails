@@ -19,8 +19,10 @@ struct PackedUserOperation {
 
 /// @title VetoOnlySessionValidator
 /// @notice An ERC-7579 validator module for a Kernel v3.1 smart account that turns a session key into a
-///         "veto-only" key: the only thing it can make the account do is call `vetoCharge` on one PocketRails
-///         contract, with no value, until the session expires.
+///         "veto-only" key: the only things it can make the account do are call `vetoCharge` or
+///         `guardianCheckIn` on one PocketRails contract, with no value, until the session expires. Neither can
+///         approve a charge or move money: a check-in only says "I'm online", which releases charges the
+///         parent chose to hold while the guardian was offline, and they still must be inside their caps.
 ///
 /// @dev How it's used: the guardian's smart account installs this module (Kernel `installModule`, type 1,
 ///      no hook, selector access to `execute` only). The guardian agent holds the session key and sends user
@@ -30,7 +32,7 @@ struct PackedUserOperation {
 ///      Checks, all during ERC-4337 validation, so a disallowed operation never executes:
 ///        - the call is Kernel `execute(bytes32 mode, bytes executionCalldata)` in single-call default mode,
 ///        - the single call's target is the PocketRails contract set at install, with value 0,
-///        - the called function is `vetoCharge(uint256,string)`,
+///        - the called function is `vetoCharge(uint256,string)` or `guardianCheckIn(uint64)`,
 ///        - the signature is the session key's (raw hash or EIP-191 signed hash),
 ///      and the session's expiry is returned as `validUntil`, so the EntryPoint enforces it (no TIMESTAMP read
 ///      during validation, per ERC-7562). Storage is keyed by the account, as ERC-7562 requires.
@@ -45,6 +47,8 @@ contract VetoOnlySessionValidator {
     bytes4 public constant EXECUTE_SELECTOR = bytes4(keccak256("execute(bytes32,bytes)"));
     /// PocketRails `vetoCharge(uint256,string)`.
     bytes4 public constant VETO_SELECTOR = bytes4(keccak256("vetoCharge(uint256,string)"));
+    /// PocketRails `guardianCheckIn(uint64)`.
+    bytes4 public constant CHECK_IN_SELECTOR = bytes4(keccak256("guardianCheckIn(uint64)"));
     uint256 internal constant MODULE_TYPE_VALIDATOR = 1;
     uint256 internal constant SIG_VALIDATION_FAILED = 1;
 
@@ -143,6 +147,6 @@ contract VetoOnlySessionValidator {
         }
         if (target != rails) revert WrongTarget(target);
         if (value != 0) revert ValueNotAllowed();
-        if (selector != VETO_SELECTOR) revert OnlyVetoCharge(selector);
+        if (selector != VETO_SELECTOR && selector != CHECK_IN_SELECTOR) revert OnlyVetoCharge(selector);
     }
 }

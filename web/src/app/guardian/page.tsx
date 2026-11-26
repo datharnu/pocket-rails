@@ -8,7 +8,7 @@ import { Explain, Guide } from "@/components/help";
 import { NotDeployed, StatusNotice, TxLink } from "@/components/ui";
 import { noteFor } from "@/lib/childActions";
 import { showcaseVaultId } from "@/lib/env";
-import { fmt, nowSec, sameAddr, short, timeLeft, useAllBillings, useAllCharges, useAllVaults, useHistory, useRails, useRailsWrite, useServerNotes } from "@/lib/rails";
+import { fmt, nowSec, sameAddr, short, timeLeft, useAllBillings, useAllCharges, useAllVaults, useGuardianHold, useHistory, useRails, useRailsWrite, useServerNotes, type Charge } from "@/lib/rails";
 import { useAction } from "@/lib/useAction";
 import { ReadOnlyContext } from "@/lib/viewMode";
 import { useHashView } from "@/lib/useHashView";
@@ -32,7 +32,17 @@ export default function GuardianPage() {
   const history = useHistory(current?.id);
   const billingIds = new Set(billings.items.filter((b) => b.data.vaultId === current?.id).map((b) => b.id));
   const list = charges.items.filter((c) => billingIds.has(c.data.billingId));
-  const open = list.filter((c) => (c.data.status === 1 && nowSec() < c.data.settleAfter) || c.data.status === 2);
+  const gh = useGuardianHold(current?.id, current?.data.guardian);
+  const billingById = new Map(billings.items.map((b) => [b.id, b.data]));
+  // Held charges (the parent's "hold while offline" is on and this guardian hasn't checked in since) can still be stopped.
+  const isHeld = (c: { id: bigint; data: Charge }) => billingById.has(c.data.billingId) && gh.isHeld(c.data, billingById.get(c.data.billingId)!);
+  const open = list.filter((c) => (c.data.status === 1 && (nowSec() < c.data.settleAfter || isHeld(c))) || c.data.status === 2);
+  const held = new Set(open.filter(isHeld).map((c) => c.id));
+  // With the hold on, pending charges this guardian hasn't checked in for. A check-in covers exactly these:
+  // up to one second after the newest one shown, so a charge that arrives later stays held.
+  const requestedAt = (c: { data: Charge }) => c.data.settleAfter - (billingById.get(c.data.billingId)?.vetoWindow ?? 0n);
+  const unchecked = gh.hold && gh.hasGuardian ? open.filter((c) => c.data.status === 1 && requestedAt(c) >= gh.lastSeen) : [];
+  const checkInUntil = unchecked.length ? unchecked.map(requestedAt).reduce((a, b) => (a > b ? a : b)) + 1n : undefined;
   const serverNote = useServerNotes(list.slice(0, 50).map((c) => c.data.memoHash));
 
   // Who stopped each charge and why, from the ChargeVetoed events.
@@ -135,7 +145,7 @@ export default function GuardianPage() {
                 <Kpi emoji="✅" label="Let through" value={letThrough} tone="mint" note="paid after the waiting time" />
                 <Kpi emoji="⏳" label="Waiting now" value={open.length} tone="sun" note="can still be stopped" />
               </section>
-              <Queue rows={open} note={note} />
+              <Queue rows={open} note={note} held={held} checkInUntil={checkInUntil} uncheckedCount={unchecked.length} />
               <section className="card">
                 <PanelHead
                   title="🧾 Latest decisions"
@@ -145,13 +155,13 @@ export default function GuardianPage() {
                     </button>
                   }
                 />
-                <Decisions rows={list} limit={6} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
+                <Decisions rows={list} held={held} limit={6} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
               </section>
             </>
           )}
           {current && view === "decisions" && (
             <section className="card">
-              <Decisions rows={list} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
+              <Decisions rows={list} held={held} note={note} vetoes={vetoes} guardian={guardianAddr} parent={current.data.parent} />
             </section>
           )}
           {current && view === "powers" && <Powers guardian={guardianAddr} />}
@@ -163,7 +173,19 @@ export default function GuardianPage() {
 
 type Row = { id: bigint; data: { amount: bigint; memoHash: `0x${string}`; settleAfter: bigint; status: number } };
 
-function Queue({ rows, note }: { rows: Row[]; note: (h: string) => string | undefined }) {
+function Queue({
+  rows,
+  note,
+  held,
+  checkInUntil,
+  uncheckedCount,
+}: {
+  rows: Row[];
+  note: (h: string) => string | undefined;
+  held: Set<bigint>;
+  checkInUntil?: bigint;
+  uncheckedCount: number;
+}) {
   const write = useRailsWrite();
   const { status, run, busy } = useAction();
   const [reason, setReason] = useState(REASONS[0]!);
@@ -191,7 +213,8 @@ function Queue({ rows, note }: { rows: Row[]; note: (h: string) => string | unde
                 {fmt(c.amount)} tUSD8 · “{note(c.memoHash) ?? "no note"}”
               </span>
               <span className="item-sub">
-                Charge #{id.toString()} · {c.status === 2 ? "waiting for the parent" : `pays in ${timeLeft(c.settleAfter)} unless stopped`}
+                Charge #{id.toString()} ·{" "}
+                {c.status === 2 ? "waiting for the parent" : held.has(id) ? "⏸️ on hold until you check in" : `pays in ${timeLeft(c.settleAfter)} unless stopped`}
               </span>
             </div>
             <button type="button" className="btn small warn" disabled={busy} onClick={() => run((s) => write("vetoCharge", [id, reason], s))}>
@@ -201,6 +224,14 @@ function Queue({ rows, note }: { rows: Row[]; note: (h: string) => string | unde
         ))}
         {rows.length === 0 && <p className="empty">Nothing waiting right now. 🎉 New school charges show up here within seconds.</p>}
       </div>
+      {checkInUntil !== undefined && (
+        <div className="actions" style={{ marginTop: 12 }}>
+          <button type="button" className="btn small secondary" disabled={busy} onClick={() => run((s) => write("guardianCheckIn", [checkInUntil], s))}>
+            👋 I&apos;ve checked {uncheckedCount === 1 ? "this charge" : `these ${uncheckedCount} charges`}: check in
+          </button>
+          <span className="fine">The parent holds charges until you check in. Checking in doesn&apos;t pay anything early; it lets the ones you didn&apos;t stop be paid when their waiting time ends.</span>
+        </div>
+      )}
       <StatusNotice status={status} />
     </section>
   );
@@ -213,8 +244,10 @@ function Decisions({
   vetoes,
   guardian,
   parent,
+  held = new Set<bigint>(),
 }: {
   rows: Row[];
+  held?: Set<bigint>;
   limit?: number;
   note: (h: string) => string | undefined;
   vetoes: Map<string, { by: string; reason: string; hash: string }>;
@@ -263,6 +296,8 @@ function Decisions({
                     <Chip tone="warn">Waiting for parent</Chip>
                   ) : c.status === 1 && nowSec() < c.settleAfter ? (
                     <Chip tone="warn">⏳ Checking · {timeLeft(c.settleAfter)}</Chip>
+                  ) : c.status === 1 && held.has(id) ? (
+                    <Chip tone="warn">⏸️ On hold until the guardian checks in</Chip>
                   ) : c.status === 1 ? (
                     <Chip tone="info">Let through, not collected yet</Chip>
                   ) : (
