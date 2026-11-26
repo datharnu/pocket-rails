@@ -40,8 +40,19 @@ args.push(
   "-c:a", "aac", "-b:a", "160k", "-ar", "44100",
   "-movflags", "+faststart",
   "-t", length.toFixed(2),
-  path.join(out, "pocket-rails-demo.mp4"),
+  path.join(out, "main.mp4"),
 );
 console.log(`cutting ${cuts.length} waits (${(end - start - length).toFixed(1)}s); final length ${length.toFixed(1)}s`);
 execFileSync("ffmpeg", args, { stdio: ["ignore", "ignore", "inherit"] });
-console.log("out/pocket-rails-demo.mp4");
+
+// A 2-second title card (intro.png) that fades into the video. It's also the poster GitHub's player shows.
+execFileSync("ffmpeg", [
+  "-y", "-loop", "1", "-framerate", "30", "-t", "2", "-i", path.join(import.meta.dirname, "intro.png"),
+  "-i", path.join(out, "main.mp4"),
+  "-filter_complex", "[0:v]format=yuv420p,setsar=1,fps=30[i];[1:v]format=yuv420p,setsar=1,fps=30[m];[i][m]xfade=transition=fade:duration=0.5:offset=1.5[v];[1:a]adelay=1500|1500[a]",
+  "-map", "[v]", "-map", "[a]",
+  "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
+  "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-movflags", "+faststart",
+  path.join(out, "pocket-rails-demo.mp4"),
+], { stdio: ["ignore", "ignore", "inherit"] });
+console.log("out/pocket-rails-demo.mp4 (with title card)");

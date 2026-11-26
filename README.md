@@ -1,8 +1,34 @@
-# Pocket Rails
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-dark.png">
+    <img src="docs/brand/logo-light.png" alt="Pocket Rails" width="440">
+  </picture>
+</p>
 
-**Kids pay out, the school bills in, parents set the rules once.**
-Every payment, in either direction, is checked by the same smart contract on QDay Aevum testnet, in tUSD8.
-AI helpers can say no, never yes: every yes traces back to a permission the parent signed.
+<p align="center">
+  <b>Kids pay out, the school bills in, parents set the rules once.</b><br>
+  Every payment, in either direction, is checked by the same smart contract on QDay Aevum testnet, in tUSD8.<br>
+  AI helpers can say no, never yes: every yes traces back to a permission the parent signed.
+</p>
+
+<p align="center">
+  <a href="https://web-production-b9d9f11e.up.railway.app"><img alt="Live app" src="https://img.shields.io/badge/live%20app-online-22A06B?style=flat-square"></a>
+  <a href="https://web-production-b9d9f11e.up.railway.app/judge"><img alt="For judges" src="https://img.shields.io/badge/for%20judges-no%20wallet%20needed-C93D25?style=flat-square"></a>
+  <a href="docs/EVIDENCE.md"><img alt="Evidence" src="https://img.shields.io/badge/evidence-29%2F29%20live%20checks-1F6FB8?style=flat-square"></a>
+  <a href="contracts/test"><img alt="Tests" src="https://img.shields.io/badge/contract%20tests-76%20%2B%2012%20fork-1F2A44?style=flat-square"></a>
+  <a href="docs/AI_EVAL.md"><img alt="AI guardian eval" src="https://img.shields.io/badge/AI%20guardian%20eval-50%2F50-F5A524?style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-5B6478?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://web-production-b9d9f11e.up.railway.app"><b>Live app</b></a> ·
+  <a href="https://web-production-b9d9f11e.up.railway.app/judge"><b>For judges</b></a> ·
+  <a href="docs/EVIDENCE.md"><b>Evidence</b></a> ·
+  <a href="docs/GUIDE.md"><b>Plain-English guide</b></a> ·
+  <a href="docs/PITCH.md"><b>Pitch</b></a>
+</p>
+
+<!-- VIDEO -->
 
 A parent wants to give a child spending money without approving every payment or handing over a card with no
 limits. The child's school also needs to collect money for meals and trips from that same allowance. Pocket
