@@ -253,8 +253,10 @@ marks.start = now();
 
 // Scene 2: the parent's rules
 {
-  await go("/parent");
-  await page.locator(".dash").waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await go("/parent");
+    await page.locator(".dash").waitFor({ timeout: 20000 });
+  });
   const v = say("s2");
   await connect("parent");
   await page.locator(".kpis").waitFor({ timeout: 20000 });
@@ -274,10 +276,12 @@ marks.start = now();
 // Scene 3: the child pays
 let refusalUrl;
 {
-  await switchTo("child");
-  await go("/child");
-  await page.locator(".wallet-card").waitFor({ timeout: 20000 });
-  await page.locator(".place").first().waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await switchTo("child");
+    await go("/child");
+    await page.locator(".wallet-card").waitFor({ timeout: 20000 });
+    await page.locator(".place").first().waitFor({ timeout: 20000 });
+  });
   const v1 = say("s3a");
   await click(page.locator(".place").first());
   await typeSlow(page.locator(".amount-input"), "0.6");
@@ -305,8 +309,10 @@ let refusalUrl;
   } else await sleep(9000);
   await v2;
 
-  await go("/child");
-  await page.locator(".place").first().waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await go("/child");
+    await page.locator(".place").first().waitFor({ timeout: 20000 });
+  });
   const v3 = say("s3c");
   await click(page.locator(".place").first());
   await typeSlow(page.locator(".amount-input"), "0.3");
@@ -323,9 +329,11 @@ let refusalUrl;
 
 // Scene 4: school billing
 {
-  await switchTo("parent");
-  await go("/parent#school");
-  await page.getByText(/Billing permissions/).first().waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await switchTo("parent");
+    await go("/parent#school");
+    await page.getByText(/Billing permissions/).first().waitFor({ timeout: 20000 });
+  });
   const v = say("s4");
   const perm = page.getByText(/max .* per charge/).first();
   await scrollTo(perm);
@@ -348,10 +356,13 @@ let refusalUrl;
 
 // Scene 5: the AI guardian
 {
-  await go("/judge");
   const card = page.locator(".card", { hasText: "Send a trick note" }).first();
-  await card.waitFor({ timeout: 20000 });
-  await scrollTo(card);
+  await waiting(async () => {
+    await go("/judge");
+    await card.waitFor({ timeout: 20000 });
+    await page.getByText(/Latest charges/).first().waitFor({ timeout: 20000 });
+    await scrollTo(card);
+  });
   const v1 = say("s5a");
   await point(card, 900);
   await sleep(1500);
@@ -370,10 +381,12 @@ let refusalUrl;
 
 // Scene 6: proof and control
 {
-  await switchTo("none");
-  await go("/guardian#decisions");
   const row = page.locator("tr", { hasText: "SYSTEM NOTICE" }).first();
-  await row.waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await switchTo("none");
+    await go("/guardian#decisions");
+    await row.waitFor({ timeout: 20000 });
+  });
   const v1 = say("s6a");
   await scrollTo(row);
   await point(row.locator("td").nth(2), 800);
@@ -386,17 +399,22 @@ let refusalUrl;
   await sleep(400);
   await waiting(async () => {
     await go(href);
-    await page.getByText(/Transaction|Tx hash|Hash/i).first().waitFor({ timeout: 30000 }).catch(() => {});
+    await page.getByText(/^Success$/).first().waitFor({ timeout: 40000 }).catch(() => log("explorer: status not shown"));
+    await sleep(1200);
   });
   await sleep(1000);
-  await glide(560, 300, 900);
-  await sleep(6000); // hold on the transaction hash
+  await point(page.getByText(/^Transaction hash$/).first(), 900);
+  await sleep(3000); // hold on the transaction hash
+  await point(page.getByText(/^handleOps$/).first(), 700);
+  await sleep(3000); // a user operation from the guardian smart account
   await v1;
 
-  await go("/parent#school");
-  await connect("parent");
   const stopped = page.getByText(/Stopped charges/).first();
-  await stopped.waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await go("/parent#school");
+    await connect("parent");
+    await stopped.waitFor({ timeout: 20000 });
+  });
   const v2 = say("s6b");
   await scrollTo(stopped, "start");
   await point(page.getByRole("button", { name: /Pay it anyway/ }), 900);
@@ -408,9 +426,12 @@ let refusalUrl;
 
 // Scene 7: close
 {
-  await switchTo("none");
-  await go("/");
-  await page.locator(".proof-band").waitFor({ timeout: 20000 });
+  await waiting(async () => {
+    await switchTo("none");
+    await go("/");
+    await page.locator(".proof-band").waitFor({ timeout: 20000 });
+    await page.getByText(/proof/).first().waitFor({ timeout: 20000 }).catch(() => {});
+  });
   const v = say("s7", 1.2);
   await caption("Testnet only. Test tokens. Not audited.");
   await scrollTo(page.locator(".proof-band"));
